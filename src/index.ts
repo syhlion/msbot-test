@@ -24,7 +24,7 @@ console.log(`PORT: ${PORT}`);
 const credentialsFactory = new ConfigurationServiceClientCredentialFactory({
     MicrosoftAppId: APP_ID,
     MicrosoftAppPassword: APP_PASSWORD,
-    MicrosoftAppType: 'MultiTenant',
+    MicrosoftAppType: 'SingleTenant',
     MicrosoftAppTenantId: APP_TENANT_ID
 });
 
@@ -66,6 +66,9 @@ app.post('/api/messages', async (request: FastifyRequest, reply: FastifyReply) =
     // 劫持回應，讓 Bot Adapter 完全控制回應
     reply.hijack();
     
+    // 追蹤是否已發送回應
+    let responseSent = false;
+    
     // 建立 Bot Framework 相容的 request/response wrapper
     const req = Object.assign(request.raw, {
         body: request.body as Record<string, unknown>
@@ -73,34 +76,55 @@ app.post('/api/messages', async (request: FastifyRequest, reply: FastifyReply) =
     
     const res = Object.assign(reply.raw, {
         status: (code: number) => {
-            reply.code(code);
+            if (!responseSent) {
+                reply.code(code);
+            }
             return res;
         },
         send: (body: any) => {
-            reply.send(body);
+            if (!responseSent) {
+                responseSent = true;
+                reply.send(body);
+            }
             return res;
         },
         header: (name: string, value: string) => {
-            reply.header(name, value);
+            if (!responseSent) {
+                reply.header(name, value);
+            }
             return res;
+        },
+        end: () => {
+            if (!responseSent) {
+                responseSent = true;
+                reply.raw.end();
+            }
         }
     });
     
-    await adapter.process(req, res, async (context) => {
-        // 記錄 activity 類型
-        console.log(`Activity type: ${context.activity.type}`);
-        
-        // 處理不同類型的 activity
-        if (context.activity.type === ActivityTypes.Message) {
-            await bot.run(context);
-        } else if (context.activity.type === ActivityTypes.ConversationUpdate) {
-            console.log('ConversationUpdate activity (ignored)');
-        } else if (context.activity.type === ActivityTypes.Typing) {
-            console.log('Typing activity (ignored)');
-        } else {
-            console.log(`未處理的 activity type: ${context.activity.type}`);
+    try {
+        await adapter.process(req, res, async (context) => {
+            // 記錄 activity 類型
+            console.log(`Activity type: ${context.activity.type}`);
+            
+            // 處理不同類型的 activity
+            if (context.activity.type === ActivityTypes.Message) {
+                await bot.run(context);
+            } else if (context.activity.type === ActivityTypes.ConversationUpdate) {
+                console.log('ConversationUpdate activity (ignored)');
+            } else if (context.activity.type === ActivityTypes.Typing) {
+                console.log('Typing activity (ignored)');
+            } else {
+                console.log(`未處理的 activity type: ${context.activity.type}`);
+            }
+        });
+    } catch (error) {
+        console.error('Bot adapter 處理錯誤:', error);
+        if (!responseSent) {
+            responseSent = true;
+            reply.code(500).send({ error: 'Internal Server Error' });
         }
-    });
+    }
 });
 
 // 啟動伺服器
