@@ -87,12 +87,19 @@ func main() {
 	if appPassword == "" {
 		log.Println("WARNING: APP_PASSWORD is not set")
 	} else {
-		log.Println("APP_PASSWORD is set (hidden)")
+		// 顯示前6個字元和長度以便驗證
+		prefix := appPassword
+		if len(appPassword) > 6 {
+			prefix = appPassword[:6] + "..."
+		}
+		log.Printf("APP_PASSWORD is set: %s (length: %d)\n", prefix, len(appPassword))
 	}
 
 	setting := core.AdapterSetting{
 		AppID:       appID,
 		AppPassword: appPassword,
+		// 設定 OpenID Metadata endpoint (使用自己的租戶)
+		OpenIDMetadata: "https://login.microsoftonline.com/60ab2bb3-a010-4d54-a508-b3e73ac2aec4/v2.0/.well-known/openid-configuration",
 	}
 
 	adapter, err := core.NewBotAdapter(setting)
