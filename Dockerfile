@@ -1,5 +1,5 @@
 # 第一階段：建置階段
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.1-alpine AS builder
 
 # 安裝必要的建置工具
 RUN apk add --no-cache git ca-certificates tzdata
