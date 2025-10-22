@@ -17,11 +17,6 @@ var customHandler = activity.HandlerFuncs{
 		log.Printf("Processing message: %s\n", turn.Activity.Text)
 		return turn.SendActivity(activity.MsgOptionText("Echo: " + turn.Activity.Text))
 	},
-	OnConversationUpdateFunc: func(turn *activity.TurnContext) (schema.Activity, error) {
-		log.Println("Conversation update received (bot added to conversation)")
-		// 當 Bot 被加入對話時，不需要特別回應
-		return schema.Activity{}, nil
-	},
 }
 
 // HTTPHandler handles the HTTP requests from then connector service
@@ -49,9 +44,9 @@ func (ht *HTTPHandler) processMessage(w http.ResponseWriter, req *http.Request) 
 	log.Printf("Activity type: %s\n", activity.Type)
 	log.Printf("Service URL: %s\n", activity.ServiceURL)
 
-	// 特別處理 typing activity，直接回傳成功
-	if activity.Type == "typing" {
-		log.Println("Typing activity ignored (not supported)")
+	// 特別處理不需要回應的 activity type
+	if activity.Type == "typing" || activity.Type == "conversationUpdate" {
+		log.Printf("%s activity ignored (no response needed)\n", activity.Type)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
