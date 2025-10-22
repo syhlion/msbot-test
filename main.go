@@ -63,6 +63,10 @@ func main() {
 	}
 
 	http.HandleFunc("/api/messages", httpHandler.processMessage)
+	http.HandleFunc("/api/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("pong"))
+	})
 	fmt.Printf("Starting server on port:%s...\n", port)
 	http.ListenAndServe(":"+port, nil)
 }
