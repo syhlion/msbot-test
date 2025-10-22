@@ -1,6 +1,6 @@
 module bot-test
 
-go 1.25.1
+go 1.25
 
 require github.com/infracloudio/msbotbuilder-go v0.2.5
 
