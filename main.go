@@ -26,27 +26,49 @@ type HTTPHandler struct {
 func (ht *HTTPHandler) processMessage(w http.ResponseWriter, req *http.Request) {
 
 	ctx := context.Background()
+	
+	// 記錄請求標頭以便除錯
+	log.Printf("Received request from: %s\n", req.RemoteAddr)
+	log.Printf("Request method: %s\n", req.Method)
+	log.Printf("Authorization header present: %v\n", req.Header.Get("Authorization") != "")
+	
 	activity, err := ht.Adapter.ParseRequest(ctx, req)
 	if err != nil {
-		fmt.Println("Failed to parse request.", err)
+		log.Printf("Failed to parse request: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	err = ht.Adapter.ProcessActivity(ctx, activity, customHandler)
 	if err != nil {
-		fmt.Println("Failed to process request", err)
+		log.Printf("Failed to process request: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println("Request processed successfully.")
+	log.Println("Request processed successfully.")
 }
 
 func main() {
 
+	appID := os.Getenv("APP_ID")
+	appPassword := os.Getenv("APP_PASSWORD")
+
+	// 記錄環境變數狀態（不輸出完整密碼）
+	if appID == "" {
+		log.Println("WARNING: APP_ID is not set")
+	} else {
+		log.Printf("APP_ID is set: %s\n", appID)
+	}
+	
+	if appPassword == "" {
+		log.Println("WARNING: APP_PASSWORD is not set")
+	} else {
+		log.Println("APP_PASSWORD is set (hidden)")
+	}
+
 	setting := core.AdapterSetting{
-		AppID:       os.Getenv("APP_ID"),
-		AppPassword: os.Getenv("APP_PASSWORD"),
+		AppID:       appID,
+		AppPassword: appPassword,
 	}
 
 	adapter, err := core.NewBotAdapter(setting)
