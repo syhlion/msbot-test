@@ -18,12 +18,11 @@
   "license": "MIT",
   "dependencies": {
     "botbuilder": "^4.22.0",
-    "restify": "^11.1.0",
+    "fastify": "^4.26.0",
     "dotenv": "^16.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "@types/restify": "^8.5.12",
     "typescript": "^5.3.3",
     "ts-node": "^10.9.2"
   },
