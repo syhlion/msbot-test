@@ -12,17 +12,20 @@ import { EchoBot } from './bot';
 const PORT = parseInt(process.env.PORT || '3978', 10);
 const APP_ID = process.env.APP_ID || '';
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
+const APP_TENANT_ID = process.env.APP_TENANT_ID || '';
 
 // 記錄啟動資訊
 console.log(`APP_ID: ${APP_ID}`);
 console.log(`APP_PASSWORD: ${APP_PASSWORD ? '****** (hidden)' : 'NOT SET'}`);
+console.log(`APP_TENANT_ID: ${APP_TENANT_ID}`);
 console.log(`PORT: ${PORT}`);
 
 // 建立認證配置
 const credentialsFactory = new ConfigurationServiceClientCredentialFactory({
     MicrosoftAppId: APP_ID,
     MicrosoftAppPassword: APP_PASSWORD,
-    MicrosoftAppType: 'MultiTenant'
+    MicrosoftAppType: 'MultiTenant',
+    MicrosoftAppTenantId: APP_TENANT_ID
 });
 
 const botFrameworkAuthentication = new ConfigurationBotFrameworkAuthentication(
@@ -60,6 +63,9 @@ app.post('/api/messages', async (request: FastifyRequest, reply: FastifyReply) =
     console.log(`收到請求: ${request.method} ${request.url}`);
     console.log(`來源: ${request.ip}`);
     
+    // 劫持回應，讓 Bot Adapter 完全控制回應
+    reply.hijack();
+    
     // 建立 Bot Framework 相容的 request/response wrapper
     const req = Object.assign(request.raw, {
         body: request.body as Record<string, unknown>
@@ -95,9 +101,6 @@ app.post('/api/messages', async (request: FastifyRequest, reply: FastifyReply) =
             console.log(`未處理的 activity type: ${context.activity.type}`);
         }
     });
-    
-    // 告訴 Fastify 不要自動發送回應（Bot Adapter 已經處理了）
-    reply.sent = true;
 });
 
 // 啟動伺服器
