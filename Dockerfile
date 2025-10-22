@@ -27,8 +27,8 @@ FROM node:20-alpine
 RUN apk add --no-cache dumb-init
 
 # 建立非 root 使用者
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
+RUN addgroup -S appuser && \
+    adduser -S -G appuser appuser
 
 # 設定工作目錄
 WORKDIR /home/appuser/app
