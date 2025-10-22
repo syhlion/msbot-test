@@ -33,6 +33,16 @@ func (ht *HTTPHandler) processMessage(w http.ResponseWriter, req *http.Request) 
 	log.Printf("Request method: %s\n", req.Method)
 	log.Printf("Authorization header present: %v\n", req.Header.Get("Authorization") != "")
 	
+	// 處理 CORS preflight 請求
+	if req.Method == "OPTIONS" {
+		log.Println("OPTIONS request (CORS preflight) - responding with 200 OK")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	
 	activity, err := ht.Adapter.ParseRequest(ctx, req)
 	if err != nil {
 		log.Printf("Failed to parse request: %v\n", err)
