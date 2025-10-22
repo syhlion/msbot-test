@@ -45,20 +45,22 @@ func (ht *HTTPHandler) processMessage(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// 記錄 activity 類型
+	// 記錄 activity 類型和 ServiceURL
 	log.Printf("Activity type: %s\n", activity.Type)
+	log.Printf("Service URL: %s\n", activity.ServiceURL)
+
+	// 特別處理 typing activity，直接回傳成功
+	if activity.Type == "typing" {
+		log.Println("Typing activity ignored (not supported)")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	err = ht.Adapter.ProcessActivity(ctx, activity, customHandler)
 	if err != nil {
 		log.Printf("Failed to process request: %v\n", err)
-		// 如果是不支援的 activity type，回傳 200 OK 避免重試
-		if activity.Type == "typing" {
-			log.Println("Typing activity ignored (not supported)")
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		// 其他錯誤才回傳 BadRequest
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		// 即使處理失敗，也回傳 200 OK 給 Azure，避免重試
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 	log.Println("Request processed successfully.")
