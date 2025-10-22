@@ -1,0 +1,49 @@
+# Git 相關
+.git
+.gitignore
+.gitattributes
+
+# IDE 相關
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 文件
+*.md
+README.md
+LICENSE
+
+# 測試檔案
+*_test.go
+testdata
+
+# 建置產物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bot-server
+
+# 臨時檔案
+*.log
+*.tmp
+tmp/
+temp/
+
+# 環境變數檔案（敏感資訊）
+.env
+.env.local
+.env.*.local
+
+# Docker 相關
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
