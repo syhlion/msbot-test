@@ -10,28 +10,29 @@
 *.swo
 *~
 
+# Node.js
+node_modules
+npm-debug.log
+yarn-error.log
+.npm
+
+# 建置產物
+dist
+*.tsbuildinfo
+
+# 測試
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+__tests__
+__mocks__
+
 # 文件
 *.md
 README.md
 LICENSE
-
-# 測試檔案
-*_test.go
-testdata
-
-# 建置產物
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-bot-server
-
-# 臨時檔案
-*.log
-*.tmp
-tmp/
-temp/
+docs
 
 # 環境變數檔案（敏感資訊）
 .env
@@ -47,3 +48,8 @@ docker-compose.yml
 .github
 .gitlab-ci.yml
 
+# 臨時檔案
+*.log
+*.tmp
+tmp/
+temp/
