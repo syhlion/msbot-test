@@ -40,7 +40,7 @@ RUN chown -R appuser:appuser /home/appuser
 USER appuser
 
 # 暴露應用程式使用的 Port（Zeabur 會自動設定 PORT 環境變數）
-EXPOSE 3978
+EXPOSE 8080
 
 # 健康檢查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
