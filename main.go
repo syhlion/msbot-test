@@ -22,11 +22,6 @@ var customHandler = activity.HandlerFuncs{
 		// 當 Bot 被加入對話時，不需要特別回應
 		return schema.Activity{}, nil
 	},
-	OnEventFunc: func(turn *activity.TurnContext) (schema.Activity, error) {
-		log.Printf("Event received: %s\n", turn.Activity.Type)
-		// 處理事件類型的 activity（例如 typing）
-		return schema.Activity{}, nil
-	},
 }
 
 // HTTPHandler handles the HTTP requests from then connector service
