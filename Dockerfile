@@ -9,13 +9,13 @@ WORKDIR /app
 
 # 複製 go.mod 和 go.sum 並下載依賴
 COPY go.mod go.sum ./
-RUN go mod download
+RUN GOTOOLCHAIN=auto go mod download
 
 # 複製原始碼
 COPY . .
 
 # 建置應用程式（靜態編譯，減少依賴）
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bot-server .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto go build -ldflags="-w -s" -o bot-server .
 
 # 第二階段：執行階段
 FROM alpine:latest
