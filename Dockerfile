@@ -4,20 +4,21 @@ FROM node:20-alpine AS builder
 # 設定工作目錄
 WORKDIR /app
 
-# 複製 package.json 和 package-lock.json (如果存在)
-COPY package*.json ./
+# 複製 package.json
+COPY package.json ./
 
-# 安裝依賴
-RUN npm ci --only=production && npm cache clean --force
+# 安裝所有依賴（包含 devDependencies 用於建置）
+RUN npm install && npm cache clean --force
 
 # 複製 TypeScript 設定和原始碼
 COPY tsconfig.json ./
 COPY src ./src
 
-# 安裝開發依賴並建置
-RUN npm install --only=development && \
-    npm run build && \
-    npm prune --production
+# 建置 TypeScript
+RUN npm run build
+
+# 移除 devDependencies，只保留 production 依賴
+RUN npm prune --production
 
 # 第二階段：執行階段
 FROM node:20-alpine
@@ -35,7 +36,7 @@ WORKDIR /home/appuser/app
 # 從建置階段複製檔案
 COPY --from=builder --chown=appuser:appuser /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appuser /app/dist ./dist
-COPY --from=builder --chown=appuser:appuser /app/package*.json ./
+COPY --from=builder --chown=appuser:appuser /app/package.json ./
 
 # 切換到非 root 使用者
 USER appuser
