@@ -14,7 +14,18 @@ import (
 
 var customHandler = activity.HandlerFuncs{
 	OnMessageFunc: func(turn *activity.TurnContext) (schema.Activity, error) {
+		log.Printf("Processing message: %s\n", turn.Activity.Text)
 		return turn.SendActivity(activity.MsgOptionText("Echo: " + turn.Activity.Text))
+	},
+	OnConversationUpdateFunc: func(turn *activity.TurnContext) (schema.Activity, error) {
+		log.Println("Conversation update received (bot added to conversation)")
+		// 當 Bot 被加入對話時，不需要特別回應
+		return schema.Activity{}, nil
+	},
+	OnEventFunc: func(turn *activity.TurnContext) (schema.Activity, error) {
+		log.Printf("Event received: %s\n", turn.Activity.Type)
+		// 處理事件類型的 activity（例如 typing）
+		return schema.Activity{}, nil
 	},
 }
 
@@ -39,13 +50,24 @@ func (ht *HTTPHandler) processMessage(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// 記錄 activity 類型
+	log.Printf("Activity type: %s\n", activity.Type)
+
 	err = ht.Adapter.ProcessActivity(ctx, activity, customHandler)
 	if err != nil {
 		log.Printf("Failed to process request: %v\n", err)
+		// 如果是不支援的 activity type，回傳 200 OK 避免重試
+		if activity.Type == "typing" {
+			log.Println("Typing activity ignored (not supported)")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		// 其他錯誤才回傳 BadRequest
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	log.Println("Request processed successfully.")
+	w.WriteHeader(http.StatusOK)
 }
 
 func main() {
