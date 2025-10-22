@@ -7,6 +7,7 @@ export class EchoBot extends ActivityHandler {
     constructor() {
         super();
 
+        
         // 處理訊息
         this.onMessage(async (context: TurnContext, next) => {
             const userMessage = context.activity.text;
