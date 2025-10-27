@@ -107,16 +107,8 @@ app.post('/api/messages', async (request: FastifyRequest, reply: FastifyReply) =
             // 記錄 activity 類型
             console.log(`Activity type: ${context.activity.type}`);
             
-            // 處理不同類型的 activity
-            if (context.activity.type === ActivityTypes.Message) {
-                await bot.run(context);
-            } else if (context.activity.type === ActivityTypes.ConversationUpdate) {
-                console.log('ConversationUpdate activity (ignored)');
-            } else if (context.activity.type === ActivityTypes.Typing) {
-                console.log('Typing activity (ignored)');
-            } else {
-                console.log(`未處理的 activity type: ${context.activity.type}`);
-            }
+            // 讓 Bot 處理所有 activity（Bot 內部會自動分配給對應的處理器）
+            await bot.run(context);
         });
     } catch (error) {
         console.error('Bot adapter 處理錯誤:', error);
