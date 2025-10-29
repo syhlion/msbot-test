@@ -27,9 +27,9 @@ export class EchoBot extends ActivityHandler {
             const isBotMentioned = isPersonalChat || this.isBotMentioned(context);
             console.log(`Bot 被 Mention: ${isBotMentioned} ${isPersonalChat ? '(一對一自動視為 true)' : ''}`);
             
-            // 檢查是否包含觸發關鍵字
-            const hasTriggerKeyword = userMessage.includes('遊戲商系統') && userMessage.includes('SRE');
-            console.log(`包含關鍵字: ${hasTriggerKeyword}`);
+            // 檢查是否包含觸發關鍵字（OR 邏輯）
+            const hasTriggerKeyword = userMessage.includes('遊戲商系統') || userMessage.toLowerCase().includes('sre');
+            console.log(`包含關鍵字: ${hasTriggerKeyword} (遊戲商系統:${userMessage.includes('遊戲商系統')}, SRE:${userMessage.toLowerCase().includes('sre')})`);
             console.log('='.repeat(50));
 
             // 混合模式：被 tag + 關鍵字 → 顯示 Adaptive Card
