@@ -168,20 +168,31 @@ export class EchoBot extends ActivityHandler {
                             ]
                         },
                         {
-                            type: 'Input.Text',
+                            type: 'Input.ChoiceSet',
                             id: 'product',
                             label: '產品/遊戲 *',
-                            placeholder: '例如：老虎機',
+                            style: 'compact',
                             isRequired: true,
-                            errorMessage: '請輸入產品名稱'
+                            errorMessage: '請選擇產品',
+                            choices: [
+                                { title: '老虎機', value: '老虎機' },
+                                { title: '棋牌', value: '棋牌' },
+                                { title: '魚機', value: '魚機' }
+                            ]
                         },
                         {
-                            type: 'Input.Text',
+                            type: 'Input.Date',
+                            id: 'issueDate',
+                            label: '發現異常日期 *',
+                            isRequired: true,
+                            errorMessage: '請選擇日期'
+                        },
+                        {
+                            type: 'Input.Time',
                             id: 'issueTime',
                             label: '發現異常時間 *',
-                            placeholder: '例如：2025-10-29 10:00',
                             isRequired: true,
-                            errorMessage: '請輸入時間'
+                            errorMessage: '請選擇時間'
                         },
                         {
                             type: 'Input.Text',
