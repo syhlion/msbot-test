@@ -362,36 +362,11 @@ export class EchoBot extends ActivityHandler {
                     style: 'good',
                     items: [
                         {
-                            type: 'ColumnSet',
-                            columns: [
-                                {
-                                    type: 'Column',
-                                    width: 'auto',
-                                    items: [
-                                        {
-                                            type: 'Image',
-                                            url: 'https://adaptivecards.io/content/icons/success.png',
-                                            size: 'Small',
-                                            width: '30px'
-                                        }
-                                    ],
-                                    verticalContentAlignment: 'Center'
-                                },
-                                {
-                                    type: 'Column',
-                                    width: 'stretch',
-                                    items: [
-                                        {
-                                            type: 'TextBlock',
-                                            text: '✅ 工單記錄已提交',
-                                            weight: 'Bolder',
-                                            size: 'Large',
-                                            wrap: true
-                                        }
-                                    ],
-                                    verticalContentAlignment: 'Center'
-                                }
-                            ]
+                            type: 'TextBlock',
+                            text: '✅ 工單記錄已提交',
+                            weight: 'Bolder',
+                            size: 'Large',
+                            wrap: true
                         }
                     ],
                     bleed: true
