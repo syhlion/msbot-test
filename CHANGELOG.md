@@ -23,21 +23,31 @@
 // 取得提交人資訊
 const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
 
-// Adaptive Card Invoke 處理
-this.onAdaptiveCardInvoke(async (context: TurnContext, invokeValue: any) => {
-    // 處理表單提交
-    await this.handleRecordSubmit(context, invokeValue.action.data);
-    // 返回成功狀態（重要！避免顯示錯誤訊息）
-    return { statusCode: 200, type: 'application/vnd.microsoft.card.adaptive', value: {} };
+// 1. 處理 Invoke 活動（避免顯示錯誤訊息）
+this.onInvokeActivity(async (context: TurnContext) => {
+    if (context.activity.name === 'adaptiveCard/action') {
+        // 返回成功狀態
+        return { status: 200, body: {} };
+    }
+    return { status: 200, body: {} };
 });
+
+// 2. 處理實際的表單資料（在 onMessage 中）
+if (context.activity.value) {
+    const submitData = context.activity.value;
+    if (submitData.action === 'submitRecord') {
+        await this.handleRecordSubmit(context, submitData);
+    }
+}
 ```
 
 **Bug 修正**：
-- ✅ 修正 TypeScript 編譯錯誤（TS2345, TS7006）
+- ✅ 修正 TypeScript 編譯錯誤（TS2345, TS7006, TS2554）
 - ✅ 修正表單提交後顯示紅色錯誤訊息的問題
-- ✅ 使用正確的 `onAdaptiveCardInvoke` 處理器處理表單提交
+- ✅ 使用正確的 `onInvokeActivity` 處理器回應 invoke 活動
+- ✅ 雙重處理機制：invoke 回應 + message 處理表單資料
 - ✅ 返回正確的 invoke response 避免 Teams 顯示「發生問題，請再試一次」
-- ✅ 優化錯誤處理：try-catch 包裹整個 invoke 處理邏輯
+- ✅ 優化錯誤處理：完整的 try-catch 包裹
 
 ### 使用者體驗 🎯
 
