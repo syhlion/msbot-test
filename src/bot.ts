@@ -404,27 +404,27 @@ export class EchoBot extends ActivityHandler {
                             type: 'FactSet',
                             facts: [
                                 {
-                                    title: '📋 工單號碼',
+                                    title: '工單號碼',
                                     value: ticketNumber
                                 },
                                 {
-                                    title: '👤 提交人',
+                                    title: '提交人',
                                     value: data.submitter || '未知'
                                 },
                                 {
-                                    title: '🌐 環境/整合商',
+                                    title: '環境/整合商',
                                     value: data.environment
                                 },
                                 {
-                                    title: '🎮 產品/遊戲',
+                                    title: '產品/遊戲',
                                     value: data.product
                                 },
                                 {
-                                    title: '📅 發現異常時間',
+                                    title: '發現異常時間',
                                     value: `${data.issueDate} ${data.issueTime}`
                                 },
                                 {
-                                    title: '⚠️ 異常分級',
+                                    title: '異常分級',
                                     value: data.severity
                                 }
                             ]
@@ -492,7 +492,7 @@ export class EchoBot extends ActivityHandler {
                     items: [
                         {
                             type: 'TextBlock',
-                            text: '📝 請確認以上資訊是否正確',
+                            text: '請確認以上資訊是否正確',
                             size: 'Small',
                             isSubtle: true,
                             wrap: true,
