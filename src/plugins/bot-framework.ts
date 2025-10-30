@@ -32,10 +32,41 @@ const botFrameworkPlugin: FastifyPluginAsync<BotFrameworkOptions> = async (fasti
     fastify.decorate('bot', bot);
     fastify.decorate('adapter', adapter);
     fastify.post('/api/messages', async (request, reply) => {
+        const requestBody = request.body as Record<string, unknown>;
+        
+        // 檢查是否為 Adaptive Card 提交（有 value 屬性）
+        const isCardSubmit = requestBody.type === 'message' && requestBody.value;
+        
+        if (isCardSubmit) {
+            console.log('[Fastify] 檢測到 Adaptive Card 提交，使用快速回應模式');
+            
+            // 立即返回 202 Accepted
+            reply.code(202).send();
+            
+            // 異步處理 Bot 邏輯
+            adapter.process(request.raw, {
+                status: () => ({ send: () => {}, end: () => {}, header: () => ({}) }),
+                send: () => {},
+                end: () => {}
+            } as any, async (context) => {
+                console.log(`[Async] Activity type: ${context.activity.type}`);
+                try {
+                    await bot.run(context);
+                } catch (error) {
+                    console.error('[Async] Bot 處理錯誤:', error);
+                }
+            }).catch(error => {
+                console.error('[Async] Adapter 處理錯誤:', error);
+            });
+            
+            return;
+        }
+        
+        // 一般訊息：使用原本的處理方式
         reply.hijack();
         let responseSent = false;
         const req = Object.assign(request.raw, {
-            body: request.body as Record<string, unknown>
+            body: requestBody
         });
         const res = Object.assign(reply.raw, {
             status: (code: number) => {

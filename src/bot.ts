@@ -37,14 +37,12 @@ export class EchoBot extends ActivityHandler {
                 // 檢查是否為取消操作
                 if (submitData.action === 'cancel') {
                     await context.sendActivity('已取消工單記錄。');
-                    // 不調用 next()，直接結束
                     return;
                 }
 
-                // 處理提交記錄
+                // 處理提交記錄（同步處理，但不等待 next）
                 if (submitData.action === 'submitRecord') {
                     await this.handleRecordSubmit(context, submitData);
-                    // 不調用 next()，直接結束
                     return;
                 }
             }
@@ -322,15 +320,190 @@ export class EchoBot extends ActivityHandler {
 
             console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
 
-            // 格式化並發送確認訊息
-            const confirmationMessage = this.formatConfirmationMessage(ticketNumber, recordData);
-            await context.sendActivity(MessageFactory.text(confirmationMessage));
+            // 更新原本的表單卡片為確認卡片
+            await this.updateToConfirmationCard(context, ticketNumber, recordData);
 
-            console.log(`[OK] 已發送確認訊息`);
+            console.log(`[OK] 已更新為確認卡片`);
         } catch (error) {
             console.error('[ERROR] 處理表單提交失敗:', error);
             await context.sendActivity('處理表單時發生錯誤，請稍後再試。');
         }
+    }
+
+    /**
+     * 更新為確認卡片
+     */
+    private async updateToConfirmationCard(context: TurnContext, ticketNumber: string, data: RecordFormData): Promise<void> {
+        const confirmationCard = this.createConfirmationCard(ticketNumber, data);
+        
+        // 更新原本的表單卡片
+        const activity = MessageFactory.attachment(confirmationCard);
+        activity.id = context.activity.replyToId;
+        
+        try {
+            await context.updateActivity(activity);
+        } catch (error) {
+            console.error('[WARN] 無法更新卡片，改為發送新訊息:', error);
+            // 如果更新失敗，改為發送新訊息
+            await context.sendActivity(activity);
+        }
+    }
+
+    /**
+     * 建立確認卡片
+     */
+    private createConfirmationCard(ticketNumber: string, data: RecordFormData): Attachment {
+        const cardPayload = {
+            type: 'AdaptiveCard',
+            version: '1.4',
+            body: [
+                {
+                    type: 'Container',
+                    style: 'good',
+                    items: [
+                        {
+                            type: 'ColumnSet',
+                            columns: [
+                                {
+                                    type: 'Column',
+                                    width: 'auto',
+                                    items: [
+                                        {
+                                            type: 'Image',
+                                            url: 'https://adaptivecards.io/content/icons/success.png',
+                                            size: 'Small',
+                                            width: '30px'
+                                        }
+                                    ],
+                                    verticalContentAlignment: 'Center'
+                                },
+                                {
+                                    type: 'Column',
+                                    width: 'stretch',
+                                    items: [
+                                        {
+                                            type: 'TextBlock',
+                                            text: '✅ 工單記錄已提交',
+                                            weight: 'Bolder',
+                                            size: 'Large',
+                                            wrap: true
+                                        }
+                                    ],
+                                    verticalContentAlignment: 'Center'
+                                }
+                            ]
+                        }
+                    ],
+                    bleed: true
+                },
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    items: [
+                        {
+                            type: 'FactSet',
+                            facts: [
+                                {
+                                    title: '📋 工單號碼',
+                                    value: ticketNumber
+                                },
+                                {
+                                    title: '👤 提交人',
+                                    value: data.submitter || '未知'
+                                },
+                                {
+                                    title: '🌐 環境/整合商',
+                                    value: data.environment
+                                },
+                                {
+                                    title: '🎮 產品/遊戲',
+                                    value: data.product
+                                },
+                                {
+                                    title: '📅 發現異常時間',
+                                    value: `${data.issueDate} ${data.issueTime}`
+                                },
+                                {
+                                    title: '⚠️ 異常分級',
+                                    value: data.severity
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**發生異常操作：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.operation,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                },
+                ...(data.userId ? [{
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**UserID 與 注單編號：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.userId,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                }] : []),
+                ...(data.description ? [{
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**異常狀況說明：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.description,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                }] : []),
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    separator: true,
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '📝 請確認以上資訊是否正確',
+                            size: 'Small',
+                            isSubtle: true,
+                            wrap: true,
+                            horizontalAlignment: 'Center'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        return CardFactory.adaptiveCard(cardPayload);
     }
 
     /**
