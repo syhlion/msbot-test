@@ -1,4 +1,20 @@
 import { ActivityHandler, TurnContext, MessageFactory, CardFactory, Attachment } from 'botbuilder';
+import { generateTicketNumber } from './utils/ticketGenerator';
+
+/**
+ * 表單資料介面
+ */
+interface RecordFormData {
+    environment: string;
+    product: string;
+    issueDate: string;
+    issueTime: string;
+    operation: string;
+    userId?: string;
+    severity: string;
+    description?: string;
+    submitter?: string;  // 提交人名稱
+}
 
 /**
  * SRE 工單記錄 Bot - 支援混合模式
@@ -50,6 +66,33 @@ export class EchoBot extends ActivityHandler {
             // 預設 Echo 模式
             const replyText = `Echo: ${userMessage}`;
             await context.sendActivity(MessageFactory.text(replyText));
+
+            await next();
+        });
+
+        // 處理表單提交
+        this.onMessageActivity(async (context: TurnContext, next) => {
+            // 檢查是否為 Adaptive Card 提交
+            if (context.activity.value) {
+                console.log('='.repeat(50));
+                console.log('收到表單提交');
+                console.log('提交資料:', JSON.stringify(context.activity.value, null, 2));
+                console.log('='.repeat(50));
+
+                const submitData = context.activity.value;
+                
+                // 檢查是否為取消操作
+                if (submitData.action === 'cancel') {
+                    await context.sendActivity('已取消工單記錄。');
+                    await next();
+                    return;
+                }
+
+                // 處理提交記錄
+                if (submitData.action === 'submitRecord') {
+                    await this.handleRecordSubmit(context, submitData);
+                }
+            }
 
             await next();
         });
@@ -252,6 +295,82 @@ export class EchoBot extends ActivityHandler {
         };
 
         return CardFactory.adaptiveCard(cardPayload);
+    }
+
+    /**
+     * 處理表單提交
+     */
+    private async handleRecordSubmit(context: TurnContext, formData: any): Promise<void> {
+        try {
+            // 取得提交人資訊
+            const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
+            
+            console.log(`[INFO] 提交人: ${submitterName} (ID: ${context.activity.from.id})`);
+
+            // 解析表單資料
+            const recordData: RecordFormData = {
+                environment: formData.environment,
+                product: formData.product,
+                issueDate: formData.issueDate,
+                issueTime: formData.issueTime,
+                operation: formData.operation,
+                userId: formData.userId,
+                severity: formData.severity,
+                description: formData.description,
+                submitter: submitterName
+            };
+
+            // 產生工單號碼
+            const ticketNumber = generateTicketNumber();
+
+            console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
+
+            // 格式化並發送確認訊息
+            const confirmationMessage = this.formatConfirmationMessage(ticketNumber, recordData);
+            await context.sendActivity(MessageFactory.text(confirmationMessage));
+
+            console.log(`[OK] 已發送確認訊息`);
+        } catch (error) {
+            console.error('[ERROR] 處理表單提交失敗:', error);
+            await context.sendActivity('處理表單時發生錯誤，請稍後再試。');
+        }
+    }
+
+    /**
+     * 格式化確認訊息
+     */
+    private formatConfirmationMessage(ticketNumber: string, data: RecordFormData): string {
+        const lines = [
+            '✅ **工單記錄已提交**',
+            '',
+            `📋 **工單號碼：** ${ticketNumber}`,
+            `👤 **提交人：** ${data.submitter}`,
+            '',
+            '📝 **工單資訊：**',
+            '',
+            `**環境/整合商：** ${data.environment}`,
+            `**產品/遊戲：** ${data.product}`,
+            `**發現異常時間：** ${data.issueDate} ${data.issueTime}`,
+            `**發生異常操作：** ${data.operation}`,
+        ];
+
+        // 選填欄位
+        if (data.userId) {
+            lines.push(`**UserID 與 注單編號：** ${data.userId}`);
+        }
+
+        lines.push(`**異常分級：** ${data.severity}`);
+
+        if (data.description) {
+            lines.push(`**異常狀況說明：** ${data.description}`);
+        }
+
+        lines.push('');
+        lines.push('---');
+        lines.push('');
+        lines.push('請確認以上資訊是否正確。');
+
+        return lines.join('\n');
     }
 
     /**
