@@ -23,44 +23,6 @@ export class EchoBot extends ActivityHandler {
     constructor() {
         super();
 
-        // 處理 Adaptive Card 提交（invoke 活動）
-        this.onInvokeActivity(async (context: TurnContext) => {
-            // 檢查是否為 Adaptive Card 的 Action.Execute
-            if (context.activity.name === 'adaptiveCard/action') {
-                console.log('='.repeat(50));
-                console.log('收到 Adaptive Card Invoke');
-                console.log('Activity Value:', JSON.stringify(context.activity.value, null, 2));
-                console.log('='.repeat(50));
-
-                try {
-                    const submitData = context.activity.value?.action?.data || context.activity.value || {};
-                    
-                    // 檢查是否為取消操作
-                    if (submitData.action === 'cancel') {
-                        await context.sendActivity('已取消工單記錄。');
-                        // 返回成功狀態
-                        return { status: 200, body: {} };
-                    }
-
-                    // 處理提交記錄
-                    if (submitData.action === 'submitRecord') {
-                        await this.handleRecordSubmit(context, submitData);
-                        // 返回成功狀態
-                        return { status: 200, body: {} };
-                    }
-
-                    // 預設回應
-                    return { status: 200, body: {} };
-                } catch (error) {
-                    console.error('[ERROR] 處理 Adaptive Card Invoke 失敗:', error);
-                    return { status: 500, body: { error: 'Internal Server Error' } };
-                }
-            }
-
-            // 其他 invoke 活動
-            return { status: 200, body: {} };
-        });
-
         // 處理訊息
         this.onMessage(async (context: TurnContext, next) => {
             // 檢查是否為 Adaptive Card 提交（通過 message 活動）
