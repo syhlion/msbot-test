@@ -23,31 +23,40 @@ export class EchoBot extends ActivityHandler {
     constructor() {
         super();
 
-        // 處理訊息
-        this.onMessage(async (context: TurnContext, next) => {
-            // 檢查是否為 Adaptive Card 提交
-            if (context.activity.value) {
-                console.log('='.repeat(50));
-                console.log('收到表單提交');
-                console.log('提交資料:', JSON.stringify(context.activity.value, null, 2));
-                console.log('='.repeat(50));
+        // 處理 Adaptive Card 提交（invoke 活動）
+        this.onAdaptiveCardInvoke(async (context: TurnContext, invokeValue: any) => {
+            console.log('='.repeat(50));
+            console.log('收到 Adaptive Card Invoke');
+            console.log('Invoke Value:', JSON.stringify(invokeValue, null, 2));
+            console.log('='.repeat(50));
 
-                const submitData = context.activity.value;
+            try {
+                const submitData = invokeValue.action?.data || {};
                 
                 // 檢查是否為取消操作
                 if (submitData.action === 'cancel') {
                     await context.sendActivity('已取消工單記錄。');
-                    await next();
-                    return;
+                    // 返回成功狀態
+                    return { statusCode: 200, type: 'application/vnd.microsoft.card.adaptive', value: {} };
                 }
 
                 // 處理提交記錄
                 if (submitData.action === 'submitRecord') {
-                    await this.handleRecordSubmit(context, submitData);
-                    await next();
-                    return;
+                    await this.handleRecordSubmit(context, invokeValue.action.data);
+                    // 返回成功狀態
+                    return { statusCode: 200, type: 'application/vnd.microsoft.card.adaptive', value: {} };
                 }
+
+                // 預設回應
+                return { statusCode: 200, type: 'application/vnd.microsoft.card.adaptive', value: {} };
+            } catch (error) {
+                console.error('[ERROR] 處理 Adaptive Card Invoke 失敗:', error);
+                return { statusCode: 500, type: 'application/vnd.microsoft.card.adaptive', value: {} };
             }
+        });
+
+        // 處理訊息
+        this.onMessage(async (context: TurnContext, next) => {
 
             const userMessage = context.activity.text || '';
             const entities = context.activity.entities || [];

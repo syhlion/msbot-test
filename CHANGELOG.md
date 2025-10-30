@@ -22,12 +22,22 @@
 ```typescript
 // 取得提交人資訊
 const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
+
+// Adaptive Card Invoke 處理
+this.onAdaptiveCardInvoke(async (context: TurnContext, invokeValue: any) => {
+    // 處理表單提交
+    await this.handleRecordSubmit(context, invokeValue.action.data);
+    // 返回成功狀態（重要！避免顯示錯誤訊息）
+    return { statusCode: 200, type: 'application/vnd.microsoft.card.adaptive', value: {} };
+});
 ```
 
 **Bug 修正**：
 - ✅ 修正 TypeScript 編譯錯誤（TS2345, TS7006）
-- ✅ 將 `onMessageActivity` 錯誤用法改為在 `onMessage` 中統一處理
-- ✅ 優化處理流程：先檢查表單提交，再處理一般訊息
+- ✅ 修正表單提交後顯示紅色錯誤訊息的問題
+- ✅ 使用正確的 `onAdaptiveCardInvoke` 處理器處理表單提交
+- ✅ 返回正確的 invoke response 避免 Teams 顯示「發生問題，請再試一次」
+- ✅ 優化錯誤處理：try-catch 包裹整個 invoke 處理邏輯
 
 ### 使用者體驗 🎯
 
