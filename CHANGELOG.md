@@ -16,12 +16,18 @@
 1. `RecordFormData` 介面新增 `submitter` 欄位
 2. `handleRecordSubmit()` 方法中擷取提交人資訊
 3. `formatConfirmationMessage()` 方法中顯示提交人名稱
+4. 修正事件處理器：將表單提交處理整合到 `onMessage` 中
 
 **程式碼片段**：
 ```typescript
 // 取得提交人資訊
 const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
 ```
+
+**Bug 修正**：
+- ✅ 修正 TypeScript 編譯錯誤（TS2345, TS7006）
+- ✅ 將 `onMessageActivity` 錯誤用法改為在 `onMessage` 中統一處理
+- ✅ 優化處理流程：先檢查表單提交，再處理一般訊息
 
 ### 使用者體驗 🎯
 

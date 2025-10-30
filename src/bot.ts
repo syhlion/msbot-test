@@ -25,6 +25,30 @@ export class EchoBot extends ActivityHandler {
 
         // 處理訊息
         this.onMessage(async (context: TurnContext, next) => {
+            // 檢查是否為 Adaptive Card 提交
+            if (context.activity.value) {
+                console.log('='.repeat(50));
+                console.log('收到表單提交');
+                console.log('提交資料:', JSON.stringify(context.activity.value, null, 2));
+                console.log('='.repeat(50));
+
+                const submitData = context.activity.value;
+                
+                // 檢查是否為取消操作
+                if (submitData.action === 'cancel') {
+                    await context.sendActivity('已取消工單記錄。');
+                    await next();
+                    return;
+                }
+
+                // 處理提交記錄
+                if (submitData.action === 'submitRecord') {
+                    await this.handleRecordSubmit(context, submitData);
+                    await next();
+                    return;
+                }
+            }
+
             const userMessage = context.activity.text || '';
             const entities = context.activity.entities || [];
             
@@ -66,33 +90,6 @@ export class EchoBot extends ActivityHandler {
             // 預設 Echo 模式
             const replyText = `Echo: ${userMessage}`;
             await context.sendActivity(MessageFactory.text(replyText));
-
-            await next();
-        });
-
-        // 處理表單提交
-        this.onMessageActivity(async (context: TurnContext, next) => {
-            // 檢查是否為 Adaptive Card 提交
-            if (context.activity.value) {
-                console.log('='.repeat(50));
-                console.log('收到表單提交');
-                console.log('提交資料:', JSON.stringify(context.activity.value, null, 2));
-                console.log('='.repeat(50));
-
-                const submitData = context.activity.value;
-                
-                // 檢查是否為取消操作
-                if (submitData.action === 'cancel') {
-                    await context.sendActivity('已取消工單記錄。');
-                    await next();
-                    return;
-                }
-
-                // 處理提交記錄
-                if (submitData.action === 'submitRecord') {
-                    await this.handleRecordSubmit(context, submitData);
-                }
-            }
 
             await next();
         });
