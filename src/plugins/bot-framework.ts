@@ -66,7 +66,10 @@ const botFrameworkPlugin: FastifyPluginAsync<BotFrameworkOptions> = async (fasti
         });
         try {
             await adapter.process(req, res, async (context) => {
-                console.log(`Activity type: ${context.activity.type}`);  // 加入日誌
+                console.log(`Activity type: ${context.activity.type}`);
+                console.log(`Activity name: ${context.activity.name}`);
+                console.log(`Has value: ${!!context.activity.value}`);
+                
                 await bot.run(context);
             });
         } catch (error) {

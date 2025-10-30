@@ -37,14 +37,14 @@ export class EchoBot extends ActivityHandler {
                 // 檢查是否為取消操作
                 if (submitData.action === 'cancel') {
                     await context.sendActivity('已取消工單記錄。');
-                    await next();
+                    // 不調用 next()，直接結束
                     return;
                 }
 
                 // 處理提交記錄
                 if (submitData.action === 'submitRecord') {
                     await this.handleRecordSubmit(context, submitData);
-                    await next();
+                    // 不調用 next()，直接結束
                     return;
                 }
             }
