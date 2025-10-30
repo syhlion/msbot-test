@@ -43,15 +43,29 @@ const botFrameworkPlugin: FastifyPluginAsync<BotFrameworkOptions> = async (fasti
             // 立即返回 202 Accepted
             reply.code(202).send();
             
+            // 建立一個符合 CloudAdapter 期望的假 response 物件
+            const dummyRes = {
+                status: (code: number) => dummyRes,
+                send: (body?: any) => dummyRes,
+                end: () => {},
+                header: (name: string, value: string) => dummyRes,
+                setHeader: (name: string, value: string) => {},
+                write: (chunk: any) => true,
+                writeHead: (statusCode: number, headers?: any) => {},
+                statusCode: 200,
+                headersSent: false
+            };
+            
             // 異步處理 Bot 邏輯
-            adapter.process(request.raw, {
-                status: () => ({ send: () => {}, end: () => {}, header: () => ({}) }),
-                send: () => {},
-                end: () => {}
-            } as any, async (context) => {
+            const req = Object.assign(request.raw, {
+                body: requestBody
+            });
+            
+            adapter.process(req, dummyRes as any, async (context) => {
                 console.log(`[Async] Activity type: ${context.activity.type}`);
                 try {
                     await bot.run(context);
+                    console.log('[Async] Bot 處理完成');
                 } catch (error) {
                     console.error('[Async] Bot 處理錯誤:', error);
                 }
