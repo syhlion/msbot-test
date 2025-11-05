@@ -14,13 +14,12 @@ export interface SheetRowData {
     operation: string;          // F: 發生異常操作
     userId: string;             // G: UserID
     betOrderId: string;         // H: 注單編號
-    issueLink: string;          // I: 異常單連結
-    errorCode: string;          // J: 異常代碼（預留）
-    severity: string;           // K: 異常嚴重度
-    priority: string;           // L: 優先級別（= 異常嚴重度）
-    assignee: string;           // M: 對應人員（提交人）
-    description: string;        // N: 發生原因（由接收方處理後填寫，Bot 不填）
-    resolution: string;         // O: 處理方式（由接收方處理後填寫，Bot 不填）
+    errorCode: string;          // I: 異常代碼
+    issueLink: string;          // J: 異常單連結
+    priority: string;           // K: 優先級別（= 異常嚴重度）
+    assignee: string;           // L: 對應人員（提交人）
+    description: string;        // M: 發生原因（由接收方處理後填寫，Bot 不填）
+    resolution: string;         // N: 處理方式（由接收方處理後填寫，Bot 不填）
 }
 
 /**
@@ -102,7 +101,7 @@ export class GoogleSheetService {
                 throw new Error('Google Sheets API 初始化失敗');
             }
 
-            // 準備要寫入的資料列（對應 A-O 欄）
+            // 準備要寫入的資料列（對應 A-N 欄）
             const row = [
                 data.ticketNumber,    // A: 工單編號
                 data.reportTime,      // B: 回報時間
@@ -112,19 +111,18 @@ export class GoogleSheetService {
                 data.operation,       // F: 發生異常操作
                 data.userId,          // G: UserID
                 data.betOrderId,      // H: 注單編號
-                data.issueLink,       // I: 異常單連結
-                data.errorCode,       // J: 異常代碼
-                data.severity,        // K: 異常嚴重度
-                data.priority,        // L: 優先級別
-                data.assignee,        // M: 對應人員
-                data.description,     // N: 發生原因
-                data.resolution,      // O: 處理方式
+                data.errorCode,       // I: 異常代碼
+                data.issueLink,       // J: 異常單連結
+                data.priority,        // K: 優先級別
+                data.assignee,        // L: 對應人員
+                data.description,     // M: 發生原因
+                data.resolution,      // N: 處理方式
             ];
 
             // 寫入資料到 Sheet
             const response = await this.sheets.spreadsheets.values.append({
                 spreadsheetId: this.spreadsheetId,
-                range: `${this.sheetName}!A:O`,
+                range: `${this.sheetName}!A:N`,
                 valueInputOption: 'RAW',
                 requestBody: {
                     values: [row],

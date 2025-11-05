@@ -53,13 +53,12 @@ export function mapFormDataToSheetRow(
         operation: formData.operation,          // F: 發生異常操作
         userId: formData.userId || '',          // G: UserID
         betOrderId: formData.betOrderId || '',  // H: 注單編號
-        issueLink,                              // I: 異常單連結
-        errorCode: formData.errorCode || '',    // J: 錯誤代碼（使用者填寫，選填）
-        severity: formData.severity,            // K: 異常嚴重度
-        priority: formData.severity,            // L: 優先級別（= 異常嚴重度）
-        assignee: formData.submitter || '',     // M: 對應人員（提交人）
-        description: '',                        // N: 發生原因（由接收方處理後填寫，Bot 留空）
-        resolution: '',                         // O: 處理方式（由接收方處理後填寫，Bot 留空）
+        errorCode: formData.errorCode || '',    // I: 異常代碼（使用者填寫，選填）
+        issueLink,                              // J: 異常單連結
+        priority: formData.severity,            // K: 優先級別（= 異常嚴重度）
+        assignee: formData.submitter || '',     // L: 對應人員（提交人）
+        description: '',                        // M: 發生原因（由接收方處理後填寫，Bot 留空）
+        resolution: '',                         // N: 處理方式（由接收方處理後填寫，Bot 留空）
     };
 }
 
