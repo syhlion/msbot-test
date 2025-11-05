@@ -7,19 +7,20 @@ import * as path from 'path';
  */
 export interface SheetRowData {
     ticketNumber: string;       // A: 工單編號
-    environment: string;        // B: 環境/整合商
-    product: string;            // C: 產品/遊戲
-    issueDateTime: string;      // D: 發生異常時間
-    operation: string;          // E: 發生異常操作
-    userId: string;             // F: UserID
-    betOrderId: string;         // G: 注單編號
-    errorCode: string;          // H: 異常代碼（預留）
+    reportTime: string;         // B: 回報時間（台灣時區）
+    environment: string;        // C: 環境/整合商
+    product: string;            // D: 產品/遊戲
+    issueDateTime: string;      // E: 發生異常時間
+    operation: string;          // F: 發生異常操作
+    userId: string;             // G: UserID
+    betOrderId: string;         // H: 注單編號
     issueLink: string;          // I: 異常單連結
-    severity: string;           // J: 異常嚴重度
-    priority: string;           // K: 優先級別（= 異常嚴重度）
-    assignee: string;           // L: 對應人員（預留）
-    description: string;        // M: 發生原因
-    resolution: string;         // N: 處理方式（預留）
+    errorCode: string;          // J: 異常代碼（預留）
+    severity: string;           // K: 異常嚴重度
+    priority: string;           // L: 優先級別（= 異常嚴重度）
+    assignee: string;           // M: 對應人員（提交人）
+    description: string;        // N: 發生原因（由接收方處理後填寫，Bot 不填）
+    resolution: string;         // O: 處理方式（由接收方處理後填寫，Bot 不填）
 }
 
 /**
@@ -101,28 +102,29 @@ export class GoogleSheetService {
                 throw new Error('Google Sheets API 初始化失敗');
             }
 
-            // 準備要寫入的資料列（對應 A-N 欄）
+            // 準備要寫入的資料列（對應 A-O 欄）
             const row = [
                 data.ticketNumber,    // A: 工單編號
-                data.environment,     // B: 環境/整合商
-                data.product,         // C: 產品/遊戲
-                data.issueDateTime,   // D: 發生異常時間
-                data.operation,       // E: 發生異常操作
-                data.userId,          // F: UserID
-                data.betOrderId,      // G: 注單編號
-                data.errorCode,       // H: 異常代碼
+                data.reportTime,      // B: 回報時間
+                data.environment,     // C: 環境/整合商
+                data.product,         // D: 產品/遊戲
+                data.issueDateTime,   // E: 發生異常時間
+                data.operation,       // F: 發生異常操作
+                data.userId,          // G: UserID
+                data.betOrderId,      // H: 注單編號
                 data.issueLink,       // I: 異常單連結
-                data.severity,        // J: 異常嚴重度
-                data.priority,        // K: 優先級別
-                data.assignee,        // L: 對應人員
-                data.description,     // M: 發生原因
-                data.resolution,      // N: 處理方式
+                data.errorCode,       // J: 異常代碼
+                data.severity,        // K: 異常嚴重度
+                data.priority,        // L: 優先級別
+                data.assignee,        // M: 對應人員
+                data.description,     // N: 發生原因
+                data.resolution,      // O: 處理方式
             ];
 
             // 寫入資料到 Sheet
             const response = await this.sheets.spreadsheets.values.append({
                 spreadsheetId: this.spreadsheetId,
-                range: `${this.sheetName}!A:N`,
+                range: `${this.sheetName}!A:O`,
                 valueInputOption: 'RAW',
                 requestBody: {
                     values: [row],

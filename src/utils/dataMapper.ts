@@ -11,6 +11,7 @@ export interface RecordFormData {
     operation: string;
     userId?: string;
     betOrderId?: string;
+    errorCode?: string;
     severity: string;
     description?: string;
     submitter?: string;
@@ -30,22 +31,35 @@ export function mapFormDataToSheetRow(
 ): SheetRowData {
     // 合併日期和時間
     const issueDateTime = `${formData.issueDate} ${formData.issueTime}`;
+    
+    // 產生台灣時區的回報時間
+    const reportTime = new Date().toLocaleString('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
 
     return {
         ticketNumber,                           // A: 工單編號
-        environment: formData.environment,      // B: 環境/整合商
-        product: formData.product,              // C: 產品/遊戲
-        issueDateTime,                          // D: 發生異常時間
-        operation: formData.operation,          // E: 發生異常操作
-        userId: formData.userId || '',          // F: UserID
-        betOrderId: formData.betOrderId || '',  // G: 注單編號
-        errorCode: '',                          // H: 異常代碼（預留，暫時留空）
+        reportTime,                             // B: 回報時間（台灣時區）
+        environment: formData.environment,      // C: 環境/整合商
+        product: formData.product,              // D: 產品/遊戲
+        issueDateTime,                          // E: 發生異常時間
+        operation: formData.operation,          // F: 發生異常操作
+        userId: formData.userId || '',          // G: UserID
+        betOrderId: formData.betOrderId || '',  // H: 注單編號
         issueLink,                              // I: 異常單連結
-        severity: formData.severity,            // J: 異常嚴重度
-        priority: formData.severity,            // K: 優先級別（= 異常嚴重度）
-        assignee: '',                           // L: 對應人員（預留，暫時留空）
-        description: formData.description || '', // M: 發生原因
-        resolution: '',                         // N: 處理方式（預留，暫時留空）
+        errorCode: formData.errorCode || '',    // J: 錯誤代碼（使用者填寫，選填）
+        severity: formData.severity,            // K: 異常嚴重度
+        priority: formData.severity,            // L: 優先級別（= 異常嚴重度）
+        assignee: formData.submitter || '',     // M: 對應人員（提交人）
+        description: '',                        // N: 發生原因（由接收方處理後填寫，Bot 留空）
+        resolution: '',                         // O: 處理方式（由接收方處理後填寫，Bot 留空）
     };
 }
 

@@ -14,6 +14,7 @@ interface RecordFormData {
     operation: string;
     userId?: string;           // UserID（獨立欄位）
     betOrderId?: string;       // 注單編號（獨立欄位）
+    errorCode?: string;        // 錯誤代碼（選填）
     severity: string;
     description?: string;
     submitter?: string;        // 提交人名稱
@@ -191,14 +192,6 @@ export class EchoBot extends ActivityHandler {
                         },
                         {
                             type: 'Input.Text',
-                            id: 'operation',
-                            label: '發生異常操作 *',
-                            placeholder: '描述操作',
-                            isRequired: true,
-                            errorMessage: '請輸入操作'
-                        },
-                        {
-                            type: 'Input.Text',
                             id: 'userId',
                             label: 'UserID',
                             placeholder: '例如：792f88d3-6836-48e4-82dd-479fc1982286'
@@ -208,6 +201,21 @@ export class EchoBot extends ActivityHandler {
                             id: 'betOrderId',
                             label: '注單編號',
                             placeholder: '例如：BET-20251103-001'
+                        },
+                        {
+                            type: 'Input.Text',
+                            id: 'errorCode',
+                            label: '錯誤代碼',
+                            placeholder: '例如：ERR-500, TIMEOUT'
+                        },
+                        {
+                            type: 'Input.Text',
+                            id: 'operation',
+                            label: '發生異常操作 *',
+                            placeholder: '詳細描述異常操作...',
+                            isMultiline: true,
+                            isRequired: true,
+                            errorMessage: '請輸入操作描述'
                         },
                         {
                             type: 'Input.ChoiceSet',
@@ -222,13 +230,6 @@ export class EchoBot extends ActivityHandler {
                                 { title: 'P2 - 中', value: 'P2' },
                                 { title: 'P3 - 低', value: 'P3' }
                             ]
-                        },
-                        {
-                            type: 'Input.Text',
-                            id: 'description',
-                            label: '異常狀況說明',
-                            placeholder: '詳細描述問題...',
-                            isMultiline: true
                         }
                     ]
                 }
@@ -321,6 +322,7 @@ export class EchoBot extends ActivityHandler {
                 operation: formData.operation,
                 userId: formData.userId,
                 betOrderId: formData.betOrderId,
+                errorCode: formData.errorCode,
                 severity: formData.severity,
                 description: formData.description,
                 submitter: submitterName
@@ -526,19 +528,19 @@ export class EchoBot extends ActivityHandler {
                         }
                     ]
                 }] : []),
-                ...(data.description ? [{
+                ...(data.errorCode ? [{
                     type: 'Container',
                     spacing: 'Small',
                     items: [
                         {
                             type: 'TextBlock',
-                            text: '**異常狀況說明：**',
+                            text: '**錯誤代碼：**',
                             weight: 'Bolder',
                             size: 'Small'
                         },
                         {
                             type: 'TextBlock',
-                            text: data.description,
+                            text: data.errorCode,
                             wrap: true,
                             spacing: 'None'
                         }
@@ -695,19 +697,19 @@ export class EchoBot extends ActivityHandler {
                         }
                     ]
                 }] : []),
-                ...(data.description ? [{
+                ...(data.errorCode ? [{
                     type: 'Container',
                     spacing: 'Small',
                     items: [
                         {
                             type: 'TextBlock',
-                            text: '**異常狀況說明：**',
+                            text: '**錯誤代碼：**',
                             weight: 'Bolder',
                             size: 'Small'
                         },
                         {
                             type: 'TextBlock',
-                            text: data.description,
+                            text: data.errorCode,
                             wrap: true,
                             spacing: 'None'
                         }
@@ -779,10 +781,6 @@ export class EchoBot extends ActivityHandler {
         }
 
         lines.push(`**異常分級：** ${data.severity}`);
-
-        if (data.description) {
-            lines.push(`**異常狀況說明：** ${data.description}`);
-        }
 
         lines.push('');
         lines.push('---');
