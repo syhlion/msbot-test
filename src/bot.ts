@@ -300,6 +300,13 @@ export class EchoBot extends ActivityHandler {
                 // 使用 19: 開頭的 thread ID (channelId)
                 const baseUrl = 'https://teams.microsoft.com/l/message';
                 
+                // 確保 timestamp 是字串格式
+                const timestamp = activity.timestamp 
+                    ? (typeof activity.timestamp === 'string' 
+                        ? activity.timestamp 
+                        : activity.timestamp.toISOString())
+                    : new Date().toISOString();
+                
                 // 構建完整連結,包含所有必要參數
                 const params = new URLSearchParams({
                     tenantId: tenantId,
@@ -307,7 +314,7 @@ export class EchoBot extends ActivityHandler {
                     parentMessageId: messageId,
                     teamName: teamName || 'Team',
                     channelName: channelName || 'Channel',
-                    createdTime: activity.timestamp || new Date().toISOString()
+                    createdTime: timestamp
                 });
                 
                 const link = `${baseUrl}/${encodeURIComponent(channelId)}/${encodeURIComponent(messageId)}?${params.toString()}`;
