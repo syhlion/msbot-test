@@ -23,6 +23,9 @@ interface RecordFormData {
  * SRE 工單記錄 Bot - 支援混合模式
  */
 export class EchoBot extends ActivityHandler {
+    // 儲存原始訊息連結的 Map: conversationId -> messageLink
+    private messageLinksCache = new Map<string, string>();
+
     constructor() {
         super();
 
@@ -69,6 +72,15 @@ export class EchoBot extends ActivityHandler {
             // 只要包含關鍵字就觸發表單（不需要 Tag Bot）
             if (hasTriggerKeyword) {
                 console.log('[OK] 觸發 Adaptive Card 表單 (偵測到關鍵字)');
+                
+                // 在發送表單前,先建立並快取訊息連結
+                const messageLink = this.buildTeamsMessageLink(context);
+                const conversationId = context.activity.conversation?.id || '';
+                if (messageLink && conversationId) {
+                    this.messageLinksCache.set(conversationId, messageLink);
+                    console.log(`[INFO] 已快取訊息連結: ${messageLink}`);
+                }
+                
                 await this.sendRecordForm(context);
                 await next();
                 return;
@@ -254,8 +266,8 @@ export class EchoBot extends ActivityHandler {
             const conversation = activity.conversation;
             const channelData = activity.channelData || {};
             
-            // 從 replyToId 獲取原始訊息 ID (觸發表單的訊息)
-            const messageId = activity.replyToId || activity.id;
+            // 使用當前訊息的 ID (觸發關鍵字的訊息)
+            const messageId = activity.id;
             
             // 從 channelData 獲取更多資訊
             const tenantId = channelData.tenant?.id || '';
@@ -267,6 +279,10 @@ export class EchoBot extends ActivityHandler {
             console.log(`  - Team ID: ${teamId}`);
             console.log(`  - Channel ID: ${channelId}`);
             console.log(`  - Message ID: ${messageId}`);
+            console.log(`  - Conversation ID: ${conversation?.id}`);
+            
+            // 記錄完整的 channelData 用於除錯
+            console.log(`  - Channel Data:`, JSON.stringify(channelData, null, 2));
             
             // 如果有必要資訊,建立連結
             if (tenantId && messageId && channelId) {
@@ -279,6 +295,7 @@ export class EchoBot extends ActivityHandler {
             }
             
             console.log('[WARN] 無法建立 Teams 訊息連結：缺少必要資訊');
+            console.log(`[DEBUG] tenantId: ${!!tenantId}, messageId: ${!!messageId}, channelId: ${!!channelId}`);
             return '';
             
         } catch (error) {
@@ -316,8 +333,17 @@ export class EchoBot extends ActivityHandler {
 
             console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
 
-            // 建立 Teams 訊息連結
-            const issueLink = this.buildTeamsMessageLink(context);
+            // 從快取中獲取 Teams 訊息連結
+            const conversationId = context.activity.conversation?.id || '';
+            const issueLink = this.messageLinksCache.get(conversationId) || '';
+            
+            if (issueLink) {
+                console.log(`[INFO] 使用快取的訊息連結: ${issueLink}`);
+                // 使用後清除快取
+                this.messageLinksCache.delete(conversationId);
+            } else {
+                console.log('[WARN] 未找到快取的訊息連結');
+            }
 
             // 寫入 Google Sheets（同步等待結果）
             if (googleSheetService.isEnabled()) {
