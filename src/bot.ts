@@ -51,39 +51,20 @@ export class EchoBot extends ActivityHandler {
             }
 
             const userMessage = context.activity.text || '';
-            const entities = context.activity.entities || [];
             
             console.log('='.repeat(50));
             console.log(`收到訊息: ${userMessage}`);
-            console.log(`Entities:`, JSON.stringify(entities, null, 2));
-            console.log(`Bot ID: ${context.activity.recipient.id}`);
-            console.log(`User ID: ${context.activity.from.id}`);
             console.log(`對話類型: ${context.activity.conversation?.conversationType || 'unknown'}`);
 
-            // 檢查對話類型
-            const isPersonalChat = context.activity.conversation?.conversationType === 'personal';
-            console.log(`一對一對話: ${isPersonalChat}`);
-
-            // 檢查是否被 tag（一對一對話中自動視為已 mention）
-            const isBotMentioned = isPersonalChat || this.isBotMentioned(context);
-            console.log(`Bot 被 Mention: ${isBotMentioned} ${isPersonalChat ? '(一對一自動視為 true)' : ''}`);
-            
-            // 檢查是否包含觸發關鍵字（OR 邏輯）
+            // 檢查是否包含觸發關鍵字
             const hasTriggerKeyword = userMessage.includes('遊戲商系統') || userMessage.toLowerCase().includes('sre');
             console.log(`包含關鍵字: ${hasTriggerKeyword} (遊戲商系統:${userMessage.includes('遊戲商系統')}, SRE:${userMessage.toLowerCase().includes('sre')})`);
             console.log('='.repeat(50));
 
-            // 混合模式：被 tag + 關鍵字 → 顯示 Adaptive Card
-            if (isBotMentioned && hasTriggerKeyword) {
-                console.log('[OK] 觸發 Adaptive Card 表單');
+            // 只要包含關鍵字就觸發表單（不需要 Tag Bot）
+            if (hasTriggerKeyword) {
+                console.log('[OK] 觸發 Adaptive Card 表單 (偵測到關鍵字)');
                 await this.sendRecordForm(context);
-                await next();
-                return;
-            }
-
-            // Command 模式
-            if (userMessage.startsWith('/')) {
-                await this.handleCommand(context, userMessage.trim());
                 await next();
                 return;
             }
@@ -104,9 +85,10 @@ export class EchoBot extends ActivityHandler {
                     console.log(`新成員加入: ${member.name || member.id}`);
                     const welcomeText = `👋 歡迎使用 SRE 工單記錄 Bot！\n\n` +
                         `📋 使用方式：\n` +
-                        `• Tag 我並提到「遊戲商系統 SRE」→ 開啟表單\n` +
-                        `• /record - 手動開啟記錄表單\n` +
-                        `• /help - 查看完整說明`;
+                        `在訊息中提到「SRE」或「遊戲商系統」即可自動觸發表單\n\n` +
+                        `範例：\n` +
+                        `• 異常回報 SRE\n` +
+                        `• 遊戲商系統有問題`;
                     await context.sendActivity(MessageFactory.text(welcomeText));
                 }
             }
@@ -115,49 +97,6 @@ export class EchoBot extends ActivityHandler {
         });
     }
 
-    /**
-     * 檢查 Bot 是否被 mention
-     */
-    private isBotMentioned(context: TurnContext): boolean {
-        const entities = context.activity.entities || [];
-        const botId = context.activity.recipient.id;
-        
-        console.log(`檢查 Mention - Bot ID: ${botId}`);
-        
-        for (const entity of entities) {
-            console.log(`  - Entity type: ${entity.type}`);
-            if (entity.type === 'mention') {
-                console.log(`    Mentioned ID: ${entity.mentioned?.id}`);
-                console.log(`    Mentioned Name: ${entity.mentioned?.name}`);
-                console.log(`    Match: ${entity.mentioned?.id === botId}`);
-            }
-        }
-        
-        return entities.some((entity: any) => 
-            entity.type === 'mention' && 
-            entity.mentioned?.id === botId
-        );
-    }
-
-    /**
-     * 處理 Command 指令
-     */
-    private async handleCommand(context: TurnContext, command: string): Promise<void> {
-        console.log(`處理指令: ${command}`);
-
-        switch(command.toLowerCase()) {
-            case '/record':
-                await this.sendRecordForm(context);
-                break;
-
-            case '/help':
-                await this.sendHelpMessage(context);
-                break;
-
-            default:
-                await context.sendActivity(`[ERROR] 未知指令: ${command}\n使用 /help 查看可用指令`);
-        }
-    }
 
     /**
      * 發送工單記錄表單 (Adaptive Card)
@@ -779,32 +718,5 @@ export class EchoBot extends ActivityHandler {
         return lines.join('\n');
     }
 
-    /**
-     * 發送說明訊息
-     */
-    private async sendHelpMessage(context: TurnContext): Promise<void> {
-        const helpText = `
-**SRE 工單記錄 Bot 使用說明**
-
-**觸發方式：**
-1. **自動觸發**：Tag 我 + 提到「遊戲商系統 SRE」
-2. **指令模式**：
-   - /record - 開啟工單記錄表單
-   - /help - 顯示此說明
-
-**範例：**
-\`\`\`
-@Bot 遊戲商系統 SRE 需要記錄工單
-\`\`\`
-
-**功能：**
-[OK] 自動偵測關鍵字觸發表單
-[OK] 互動式表單填寫
-[OK] 資料驗證
-[WIP] Google Sheet 整合（開發中）
-        `.trim();
-
-        await context.sendActivity(MessageFactory.text(helpText));
-    }
 }
 
