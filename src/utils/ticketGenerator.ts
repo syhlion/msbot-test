@@ -27,7 +27,7 @@ export function generateTicketNumber(): string {
     // 隨機數: 000-999
     const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
     
-    return `SRE-${dateString}-${timeString}-${random}`;
+    return `ISSUE-${dateString}-${timeString}-${random}`;
 }
 
 /**

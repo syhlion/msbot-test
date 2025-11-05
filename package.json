@@ -20,7 +20,8 @@
     "botbuilder": "^4.22.0",
     "dotenv": "^16.4.0",
     "fastify": "^4.26.0",
-    "fastify-plugin": "^5.1.0"
+    "fastify-plugin": "^5.1.0",
+    "googleapis": "^131.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

@@ -1,5 +1,7 @@
 import { ActivityHandler, TurnContext, MessageFactory, CardFactory, Attachment } from 'botbuilder';
 import { generateTicketNumber } from './utils/ticketGenerator';
+import { googleSheetService } from './services/googleSheetService';
+import { mapFormDataToSheetRow } from './utils/dataMapper';
 
 /**
  * 表單資料介面
@@ -10,10 +12,11 @@ interface RecordFormData {
     issueDate: string;
     issueTime: string;
     operation: string;
-    userId?: string;
+    userId?: string;           // UserID（獨立欄位）
+    betOrderId?: string;       // 注單編號（獨立欄位）
     severity: string;
     description?: string;
-    submitter?: string;  // 提交人名稱
+    submitter?: string;        // 提交人名稱
 }
 
 /**
@@ -243,8 +246,14 @@ export class EchoBot extends ActivityHandler {
                         {
                             type: 'Input.Text',
                             id: 'userId',
-                            label: 'UserID 與 注單編號',
+                            label: 'UserID',
                             placeholder: '例如：792f88d3-6836-48e4-82dd-479fc1982286'
+                        },
+                        {
+                            type: 'Input.Text',
+                            id: 'betOrderId',
+                            label: '注單編號',
+                            placeholder: '例如：BET-20251103-001'
                         },
                         {
                             type: 'Input.ChoiceSet',
@@ -310,6 +319,7 @@ export class EchoBot extends ActivityHandler {
                 issueTime: formData.issueTime,
                 operation: formData.operation,
                 userId: formData.userId,
+                betOrderId: formData.betOrderId,
                 severity: formData.severity,
                 description: formData.description,
                 submitter: submitterName
@@ -320,10 +330,34 @@ export class EchoBot extends ActivityHandler {
 
             console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
 
-            // 更新原本的表單卡片為確認卡片
-            await this.updateToConfirmationCard(context, ticketNumber, recordData);
+            // 寫入 Google Sheets（同步等待結果）
+            if (googleSheetService.isEnabled()) {
+                console.log('[INFO] 開始寫入 Google Sheets...');
+                const sheetRowData = mapFormDataToSheetRow(ticketNumber, recordData);
+                
+                try {
+                    // 同步等待寫入結果
+                    await googleSheetService.appendRow(sheetRowData);
+                    console.log(`[OK] Google Sheets 寫入成功: ${ticketNumber}`);
+                    
+                    // 寫入成功，顯示確認卡片
+                    await this.updateToConfirmationCard(context, ticketNumber, recordData);
+                    console.log(`[OK] 已更新為確認卡片`);
+                    
+                } catch (sheetError: any) {
+                    // 寫入失敗，顯示錯誤卡片
+                    console.error(`[ERROR] Google Sheets 寫入失敗: ${sheetError}`);
+                    const errorMessage = sheetError?.message || String(sheetError);
+                    await this.updateToErrorCard(context, ticketNumber, recordData, errorMessage);
+                    console.log(`[ERROR] 已更新為錯誤卡片`);
+                }
+            } else {
+                console.log('[INFO] Google Sheets 功能未啟用，跳過寫入');
+                // 功能未啟用時仍然顯示確認卡片
+                await this.updateToConfirmationCard(context, ticketNumber, recordData);
+                console.log(`[OK] 已更新為確認卡片（未啟用 Google Sheets）`);
+            }
 
-            console.log(`[OK] 已更新為確認卡片`);
         } catch (error) {
             console.error('[ERROR] 處理表單提交失敗:', error);
             await context.sendActivity('處理表單時發生錯誤，請稍後再試。');
@@ -338,6 +372,25 @@ export class EchoBot extends ActivityHandler {
         
         // 更新原本的表單卡片
         const activity = MessageFactory.attachment(confirmationCard);
+        activity.id = context.activity.replyToId;
+        
+        try {
+            await context.updateActivity(activity);
+        } catch (error) {
+            console.error('[WARN] 無法更新卡片，改為發送新訊息:', error);
+            // 如果更新失敗，改為發送新訊息
+            await context.sendActivity(activity);
+        }
+    }
+
+    /**
+     * 更新為錯誤卡片
+     */
+    private async updateToErrorCard(context: TurnContext, ticketNumber: string, data: RecordFormData, errorMessage: string): Promise<void> {
+        const errorCard = this.createErrorCard(ticketNumber, data, errorMessage);
+        
+        // 更新原本的表單卡片
+        const activity = MessageFactory.attachment(errorCard);
         activity.id = context.activity.replyToId;
         
         try {
@@ -430,13 +483,31 @@ export class EchoBot extends ActivityHandler {
                     items: [
                         {
                             type: 'TextBlock',
-                            text: '**UserID 與 注單編號：**',
+                            text: '**UserID：**',
                             weight: 'Bolder',
                             size: 'Small'
                         },
                         {
                             type: 'TextBlock',
                             text: data.userId,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                }] : []),
+                ...(data.betOrderId ? [{
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**注單編號：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.betOrderId,
                             wrap: true,
                             spacing: 'None'
                         }
@@ -472,6 +543,196 @@ export class EchoBot extends ActivityHandler {
                             isSubtle: true,
                             wrap: true,
                             horizontalAlignment: 'Center'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        return CardFactory.adaptiveCard(cardPayload);
+    }
+
+    /**
+     * 建立錯誤卡片
+     */
+    private createErrorCard(ticketNumber: string, data: RecordFormData, errorMessage: string): Attachment {
+        const cardPayload = {
+            type: 'AdaptiveCard',
+            version: '1.4',
+            body: [
+                {
+                    type: 'Container',
+                    style: 'attention',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '⚠️ 工單提交失敗',
+                            weight: 'Bolder',
+                            size: 'Large',
+                            wrap: true
+                        }
+                    ],
+                    bleed: true
+                },
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '工單資料寫入 Google Sheets 時發生錯誤，請稍後重試或聯繫管理員。',
+                            wrap: true,
+                            color: 'Attention'
+                        }
+                    ]
+                },
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    separator: true,
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '工單資訊',
+                            weight: 'Bolder',
+                            size: 'Medium'
+                        },
+                        {
+                            type: 'FactSet',
+                            facts: [
+                                {
+                                    title: '工單號碼',
+                                    value: `${ticketNumber} (未寫入)`
+                                },
+                                {
+                                    title: '提交人',
+                                    value: data.submitter || '未知'
+                                },
+                                {
+                                    title: '環境/整合商',
+                                    value: data.environment
+                                },
+                                {
+                                    title: '產品/遊戲',
+                                    value: data.product
+                                },
+                                {
+                                    title: '發現異常時間',
+                                    value: `${data.issueDate} ${data.issueTime}`
+                                },
+                                {
+                                    title: '異常分級',
+                                    value: data.severity
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**發生異常操作：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.operation,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                },
+                ...(data.userId ? [{
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**UserID：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.userId,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                }] : []),
+                ...(data.betOrderId ? [{
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**注單編號：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.betOrderId,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                }] : []),
+                ...(data.description ? [{
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '**異常狀況說明：**',
+                            weight: 'Bolder',
+                            size: 'Small'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: data.description,
+                            wrap: true,
+                            spacing: 'None'
+                        }
+                    ]
+                }] : []),
+                {
+                    type: 'Container',
+                    spacing: 'Medium',
+                    separator: true,
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '錯誤詳情',
+                            weight: 'Bolder',
+                            size: 'Small',
+                            color: 'Attention'
+                        },
+                        {
+                            type: 'TextBlock',
+                            text: errorMessage,
+                            wrap: true,
+                            spacing: 'None',
+                            size: 'Small',
+                            isSubtle: true
+                        }
+                    ]
+                },
+                {
+                    type: 'Container',
+                    spacing: 'Small',
+                    items: [
+                        {
+                            type: 'TextBlock',
+                            text: '💡 請重新提交表單，或將以上資訊截圖後聯繫技術人員。',
+                            size: 'Small',
+                            wrap: true,
+                            horizontalAlignment: 'Center',
+                            isSubtle: true
                         }
                     ]
                 }
