@@ -86,26 +86,24 @@ export class EchoBot extends ActivityHandler {
                 return;
             }
 
-            // 預設 Echo 模式
-            const replyText = `Echo: ${userMessage}`;
-            await context.sendActivity(MessageFactory.text(replyText));
-
+            // 不包含關鍵字的訊息不回應 (移除 Echo 模式)
             await next();
         });
 
-        // 處理成員加入
+        // 處理成員加入 (只在 Bot 被安裝時顯示歡迎訊息)
         this.onMembersAdded(async (context: TurnContext, next) => {
             const membersAdded = context.activity.membersAdded || [];
             
             for (const member of membersAdded) {
-                if (member.id !== context.activity.recipient.id) {
-                    console.log(`新成員加入: ${member.name || member.id}`);
-                    const welcomeText = `👋 歡迎使用 SRE 工單記錄 Bot！\n\n` +
-                        `📋 使用方式：\n` +
+                // 只有當 Bot 自己被加入時才顯示歡迎訊息
+                if (member.id === context.activity.recipient.id) {
+                    console.log(`Bot 被安裝到: ${context.activity.conversation?.name || 'unknown'}`);
+                    const welcomeText = `歡迎使用 SRE 工單記錄 Bot\n\n` +
+                        `使用方式：\n` +
                         `在訊息中提到「SRE」或「遊戲商系統」即可自動觸發表單\n\n` +
                         `範例：\n` +
-                        `• 異常回報 SRE\n` +
-                        `• 遊戲商系統有問題`;
+                        `- 異常回報 SRE\n` +
+                        `- 遊戲商系統有問題`;
                     await context.sendActivity(MessageFactory.text(welcomeText));
                 }
             }
