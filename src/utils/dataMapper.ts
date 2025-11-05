@@ -20,11 +20,13 @@ export interface RecordFormData {
  * 將 Bot 表單資料轉換為 Google Sheets 資料格式
  * @param ticketNumber 工單編號
  * @param formData 表單資料
+ * @param issueLink Teams 訊息連結（選填）
  * @returns Google Sheets 資料列
  */
 export function mapFormDataToSheetRow(
     ticketNumber: string,
-    formData: RecordFormData
+    formData: RecordFormData,
+    issueLink: string = ''
 ): SheetRowData {
     // 合併日期和時間
     const issueDateTime = `${formData.issueDate} ${formData.issueTime}`;
@@ -38,11 +40,12 @@ export function mapFormDataToSheetRow(
         userId: formData.userId || '',          // F: UserID
         betOrderId: formData.betOrderId || '',  // G: 注單編號
         errorCode: '',                          // H: 異常代碼（預留，暫時留空）
-        severity: formData.severity,            // I: 異常嚴重度
-        priority: formData.severity,            // J: 優先級別（= 異常嚴重度）
-        assignee: '',                           // K: 對應人員（預留，暫時留空）
-        description: formData.description || '', // L: 發生原因
-        resolution: '',                         // M: 處理方式（預留，暫時留空）
+        issueLink,                              // I: 異常單連結
+        severity: formData.severity,            // J: 異常嚴重度
+        priority: formData.severity,            // K: 優先級別（= 異常嚴重度）
+        assignee: '',                           // L: 對應人員（預留，暫時留空）
+        description: formData.description || '', // M: 發生原因
+        resolution: '',                         // N: 處理方式（預留，暫時留空）
     };
 }
 

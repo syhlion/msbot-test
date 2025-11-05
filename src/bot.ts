@@ -55,6 +55,11 @@ export class EchoBot extends ActivityHandler {
             console.log('='.repeat(50));
             console.log(`收到訊息: ${userMessage}`);
             console.log(`對話類型: ${context.activity.conversation?.conversationType || 'unknown'}`);
+            
+            // 記錄 channelData 以便除錯連結生成
+            if (context.activity.channelData) {
+                console.log(`Channel Data:`, JSON.stringify(context.activity.channelData, null, 2));
+            }
 
             // 檢查是否包含觸發關鍵字
             const hasTriggerKeyword = userMessage.includes('遊戲商系統') || userMessage.toLowerCase().includes('sre');
@@ -241,6 +246,48 @@ export class EchoBot extends ActivityHandler {
     }
 
     /**
+     * 建立 Teams 訊息連結
+     */
+    private buildTeamsMessageLink(context: TurnContext): string {
+        try {
+            const activity = context.activity;
+            const conversation = activity.conversation;
+            const channelData = activity.channelData || {};
+            
+            // 從 replyToId 獲取原始訊息 ID (觸發表單的訊息)
+            const messageId = activity.replyToId || activity.id;
+            
+            // 從 channelData 獲取更多資訊
+            const tenantId = channelData.tenant?.id || '';
+            const teamId = channelData.team?.id || '';
+            const channelId = channelData.channel?.id || conversation?.id || '';
+            
+            console.log('[INFO] Teams 訊息連結資訊:');
+            console.log(`  - Tenant ID: ${tenantId}`);
+            console.log(`  - Team ID: ${teamId}`);
+            console.log(`  - Channel ID: ${channelId}`);
+            console.log(`  - Message ID: ${messageId}`);
+            
+            // 如果有必要資訊,建立連結
+            if (tenantId && messageId && channelId) {
+                // Teams 深層連結格式
+                const baseUrl = 'https://teams.microsoft.com/l/message';
+                const link = `${baseUrl}/${encodeURIComponent(channelId)}/${encodeURIComponent(messageId)}?tenantId=${encodeURIComponent(tenantId)}`;
+                
+                console.log(`[OK] 建立 Teams 訊息連結: ${link}`);
+                return link;
+            }
+            
+            console.log('[WARN] 無法建立 Teams 訊息連結：缺少必要資訊');
+            return '';
+            
+        } catch (error) {
+            console.error('[ERROR] 建立 Teams 訊息連結失敗:', error);
+            return '';
+        }
+    }
+
+    /**
      * 處理表單提交
      */
     private async handleRecordSubmit(context: TurnContext, formData: any): Promise<void> {
@@ -269,10 +316,13 @@ export class EchoBot extends ActivityHandler {
 
             console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
 
+            // 建立 Teams 訊息連結
+            const issueLink = this.buildTeamsMessageLink(context);
+
             // 寫入 Google Sheets（同步等待結果）
             if (googleSheetService.isEnabled()) {
                 console.log('[INFO] 開始寫入 Google Sheets...');
-                const sheetRowData = mapFormDataToSheetRow(ticketNumber, recordData);
+                const sheetRowData = mapFormDataToSheetRow(ticketNumber, recordData, issueLink);
                 
                 try {
                     // 同步等待寫入結果
