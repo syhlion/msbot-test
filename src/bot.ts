@@ -271,30 +271,53 @@ export class EchoBot extends ActivityHandler {
             // 從 channelData 獲取更多資訊
             const tenantId = channelData.tenant?.id || '';
             const teamId = channelData.team?.id || '';
-            const channelId = channelData.channel?.id || conversation?.id || '';
+            const channelId = channelData.channel?.id || '';
+            const teamName = channelData.team?.name || '';
+            const channelName = channelData.channel?.name || '';
             
             console.log('[INFO] Teams 訊息連結資訊:');
             console.log(`  - Tenant ID: ${tenantId}`);
             console.log(`  - Team ID: ${teamId}`);
+            console.log(`  - Team Name: ${teamName}`);
             console.log(`  - Channel ID: ${channelId}`);
+            console.log(`  - Channel Name: ${channelName}`);
             console.log(`  - Message ID: ${messageId}`);
             console.log(`  - Conversation ID: ${conversation?.id}`);
             
-            // 記錄完整的 channelData 用於除錯
-            console.log(`  - Channel Data:`, JSON.stringify(channelData, null, 2));
+            // 記錄完整的 activity 用於除錯
+            console.log(`  - Activity:`, JSON.stringify({
+                id: activity.id,
+                timestamp: activity.timestamp,
+                channelId: activity.channelId,
+                serviceUrl: activity.serviceUrl,
+                conversation: conversation,
+                channelData: channelData
+            }, null, 2));
             
             // 如果有必要資訊,建立連結
-            if (tenantId && messageId && channelId) {
-                // Teams 深層連結格式
+            if (tenantId && messageId && channelId && teamId) {
+                // Teams 深層連結格式 (完整版)
+                // 使用 19: 開頭的 thread ID (channelId)
                 const baseUrl = 'https://teams.microsoft.com/l/message';
-                const link = `${baseUrl}/${encodeURIComponent(channelId)}/${encodeURIComponent(messageId)}?tenantId=${encodeURIComponent(tenantId)}`;
+                
+                // 構建完整連結,包含所有必要參數
+                const params = new URLSearchParams({
+                    tenantId: tenantId,
+                    groupId: teamId,
+                    parentMessageId: messageId,
+                    teamName: teamName || 'Team',
+                    channelName: channelName || 'Channel',
+                    createdTime: activity.timestamp || new Date().toISOString()
+                });
+                
+                const link = `${baseUrl}/${encodeURIComponent(channelId)}/${encodeURIComponent(messageId)}?${params.toString()}`;
                 
                 console.log(`[OK] 建立 Teams 訊息連結: ${link}`);
                 return link;
             }
             
             console.log('[WARN] 無法建立 Teams 訊息連結：缺少必要資訊');
-            console.log(`[DEBUG] tenantId: ${!!tenantId}, messageId: ${!!messageId}, channelId: ${!!channelId}`);
+            console.log(`[DEBUG] tenantId: ${!!tenantId}, teamId: ${!!teamId}, messageId: ${!!messageId}, channelId: ${!!channelId}`);
             return '';
             
         } catch (error) {
