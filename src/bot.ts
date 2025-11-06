@@ -211,29 +211,37 @@ export class EchoBot extends ActivityHandler {
         
         console.log('[INFO] 開始解析訊息內容...');
         
-        // 解析環境/整合商 (支援表格格式: "環境/整合商: pgs-prod / 1xbet")
-        const envMatch = message.match(/環境[\/\s]*整合商[:\s]*([^\n]+)/i);
+        // 解析環境/整合商 (支援表格格式: "環境/整合商 * pgs-prod / 1xbet" 或 "環境/整合商: pgs-prod")
+        // 使用更寬鬆的正則表達式,支援星號和多種分隔符
+        const envMatch = message.match(/環境[\/\s]*整合商[*\s:：]*([^\n]+)/i);
         if (envMatch) {
             const envText = envMatch[1].trim();
+            console.log(`[解析 DEBUG] 找到環境欄位內容: "${envText}"`);
             if (envText.includes('pgs-prod')) result.environment = 'pgs-prod';
             else if (envText.includes('pgs-stage')) result.environment = 'pgs-stage';
             else if (envText.includes('1xbet')) result.environment = '1xbet';
             console.log(`[解析] 環境/整合商: ${result.environment}`);
         } else {
             // Fallback: 直接搜尋關鍵字
+            console.log('[解析 DEBUG] 未找到環境欄位,使用 Fallback 搜尋');
             if (message.includes('pgs-prod')) result.environment = 'pgs-prod';
             else if (message.includes('pgs-stage')) result.environment = 'pgs-stage';
             else if (message.includes('1xbet')) result.environment = '1xbet';
+            if (result.environment) {
+                console.log(`[解析] 環境/整合商 (Fallback): ${result.environment}`);
+            }
         }
         
-        // 解析產品/遊戲 (支援表格格式: "產品/遊戲: 老虎機 /")
-        const productMatch = message.match(/產品[\/\s]*遊戲[:\s]*([^\n]+)/i);
+        // 解析產品/遊戲 (支援表格格式: "產品/遊戲 * 老虎機 /" 或 "產品/遊戲: 老虎機")
+        const productMatch = message.match(/產品[\/\s]*遊戲[*\s:：]*([^\n]+)/i);
         if (productMatch) {
             const productText = productMatch[1].trim();
             if (productText.includes('老虎機')) result.product = '老虎機';
             else if (productText.includes('棋牌')) result.product = '棋牌';
             else if (productText.includes('魚機')) result.product = '魚機';
-            console.log(`[解析] 產品/遊戲: ${result.product}`);
+            if (result.product) {
+                console.log(`[解析] 產品/遊戲: ${result.product}`);
+            }
         } else {
             // Fallback
             if (message.includes('老虎機')) result.product = '老虎機';
@@ -241,8 +249,8 @@ export class EchoBot extends ActivityHandler {
             else if (message.includes('魚機')) result.product = '魚機';
         }
         
-        // 解析發現異常時間 (支援表格格式: "發現異常時間: 2025-10-29 10:00")
-        const issueTimeMatch = message.match(/發[現生][異常]*時間[:\s]*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
+        // 解析發現異常時間 (支援表格格式: "發現異常時間 * 2025-10-29 10:00")
+        const issueTimeMatch = message.match(/發[現生][異常]*時間[*\s:：]*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
         if (issueTimeMatch) {
             result.issueDate = `${issueTimeMatch[1]}-${issueTimeMatch[2]}-${issueTimeMatch[3]}`;
             result.issueTime = `${issueTimeMatch[4]}:${issueTimeMatch[5]}`;
@@ -269,21 +277,22 @@ export class EchoBot extends ActivityHandler {
             console.log(`[解析] 注單編號: ${result.betOrderId}`);
         }
         
-        // 解析異常代碼 (支援表格格式: "異常代碼: ERR3331")
-        const errorCodeMatch = message.match(/異常代碼[:\s]*([A-Z0-9_]+)/i);
+        // 解析異常代碼 (支援表格格式: "異常代碼 * ERR3331" 或留空)
+        const errorCodeMatch = message.match(/異常代碼[*\s:：]*([A-Z0-9_]+)/i);
         if (errorCodeMatch && errorCodeMatch[1].trim()) {
             result.errorCode = errorCodeMatch[1].trim();
             console.log(`[解析] 異常代碼: ${result.errorCode}`);
         } else {
             // Fallback: 搜尋 ERR 或 _ERROR 格式
-            const fallbackMatch = message.match(/ERR[0-9A-Z_]+|[A-Z_]+_ERROR/i);
+            const fallbackMatch = message.match(/ERR[0-9A-Z_]+|[A-Z_]+_ERROR|RS_ERROR[A-Z_]*/i);
             if (fallbackMatch) {
                 result.errorCode = fallbackMatch[0];
+                console.log(`[解析] 異常代碼 (Fallback): ${result.errorCode}`);
             }
         }
         
-        // 解析異常分級 (支援表格格式: "異常分級: P2")
-        const severityMatch = message.match(/異常分[級级][:\s]*(P[0-3])/i);
+        // 解析異常分級 (支援表格格式: "異常分級 * P2")
+        const severityMatch = message.match(/異常分[級级][*\s:：]*(P[0-3])/i);
         if (severityMatch) {
             result.severity = severityMatch[1].toUpperCase();
             console.log(`[解析] 異常分級: ${result.severity}`);
@@ -293,6 +302,9 @@ export class EchoBot extends ActivityHandler {
             else if (message.match(/P1|高/i)) result.severity = 'P1';
             else if (message.match(/P2|中/i)) result.severity = 'P2';
             else if (message.match(/P3|低/i)) result.severity = 'P3';
+            if (result.severity) {
+                console.log(`[解析] 異常分級 (Fallback): ${result.severity}`);
+            }
         }
         
         // 解析發生異常操作 (從表格中提取問題描述)
