@@ -59,17 +59,25 @@ export class EchoBot extends ActivityHandler {
                 channelName: channelData.channel?.name,
                 channelId: channelData.channel?.id,
                 teamsChannelId: channelData.teamsChannelId,
+                teamsTeamId: channelData.teamsTeamId,
+                teamName: channelData.team?.name,
                 conversationName: context.activity.conversation?.name,
-                conversationId: context.activity.conversation?.id
+                conversationId: context.activity.conversation?.id,
+                conversationType: context.activity.conversation?.conversationType
             }, null, 2));
+            
+            // 輸出完整的 channelData 以便除錯
+            console.log(`[DEBUG] 完整 channelData:`, JSON.stringify(channelData, null, 2));
             console.log('='.repeat(50));
 
-            // 根據頻道名稱找到對應的配置
-            const config = getChannelConfig(channelName);
+            // 根據頻道名稱或頻道 ID 找到對應的配置
+            const channelId = channelData.teamsChannelId || channelData.channel?.id || '';
+            const config = getChannelConfig(channelName, channelId);
             
             if (!config) {
-                console.log(`[跳過] 頻道「${channelName}」沒有對應的配置`);
+                console.log(`[跳過] 頻道「${channelName}」(ID: ${channelId}) 沒有對應的配置`);
                 console.log(`[提示] 請確認頻道名稱是否包含配置中的關鍵字: ${channelConfigs.map(c => c.name).join(', ')}`);
+                console.log(`[提示] 或者將此頻道 ID 加入白名單: allowedChannelIds: ['${channelId}']`);
                 await next();
                 return;
             }
