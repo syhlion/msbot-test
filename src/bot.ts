@@ -45,59 +45,46 @@ export class EchoBot extends ActivityHandler {
             // 處理一般訊息
             const userMessage = context.activity.text || '';
             
-            // 嘗試從多個地方取得頻道名稱
+            // 使用 TeamsInfo API 取得頻道名稱
             const channelData = context.activity.channelData || {};
-            let channelName = channelData.channel?.name || 
-                             context.activity.conversation?.name || 
-                             '';
+            let channelName = '';
             
-            // 使用 TeamsInfo API 取得頻道詳細資訊 (包括中文名稱)
-            // 只要沒有明確的中文名稱,就嘗試呼叫 API
-            if (!channelName || channelName.includes('@thread.tacv2')) {
-                if (channelData.teamsTeamId && channelData.teamsChannelId) {
-                    try {
-                        console.log('[INFO] 嘗試使用 TeamsInfo API 取得頻道名稱...');
-                        console.log(`[INFO] Team ID: ${channelData.teamsTeamId}`);
-                        console.log(`[INFO] Channel ID: ${channelData.teamsChannelId}`);
-                        
-                        const channels = await TeamsInfo.getTeamChannels(context, channelData.teamsTeamId);
-                        console.log(`[INFO] 取得 ${channels.length} 個頻道`);
-                        console.log(`[DEBUG] 所有頻道資訊:`, JSON.stringify(channels, null, 2));
-                        
-                        const currentChannel = channels.find(ch => ch.id === channelData.teamsChannelId);
-                        if (currentChannel) {
-                            console.log(`[DEBUG] 找到的頻道物件:`, JSON.stringify(currentChannel, null, 2));
-                            channelName = currentChannel.name || '';
-                            console.log(`[OK] TeamsInfo API 成功取得頻道名稱: "${channelName}"`);
-                            
-                            if (!channelName) {
-                                console.log(`[WARNING] 頻道名稱為空! 嘗試其他欄位...`);
-                                // 嘗試其他可能的欄位
-                                channelName = (currentChannel as any).displayName || '';
-                                if (channelName) {
-                                    console.log(`[OK] 使用 displayName: "${channelName}"`);
-                                }
-                            }
-                        } else {
-                            console.log(`[ERROR] 在團隊的 ${channels.length} 個頻道中找不到 ID: ${channelData.teamsChannelId}`);
-                            console.log(`[DEBUG] 可用的頻道:`, channels.map(ch => ({ id: ch.id, name: ch.name })));
-                            channelName = '';
-                        }
-                    } catch (error: any) {
-                        console.error('[ERROR] TeamsInfo API 呼叫失敗:', error?.message || error);
-                        console.error('[ERROR] 完整錯誤:', error);
-                        channelName = '';
-                    }
-                } else {
-                    console.log('[ERROR] 缺少 Team ID 或 Channel ID,無法呼叫 TeamsInfo API');
-                    channelName = '';
-                }
+            if (!channelData.teamsTeamId || !channelData.teamsChannelId) {
+                console.log('[ERROR] 缺少 Team ID 或 Channel ID,無法呼叫 TeamsInfo API');
+                await next();
+                return;
             }
             
-            // 如果無法取得頻道名稱,直接跳過
-            if (!channelName) {
-                console.log('[ERROR] 無法取得頻道名稱,Bot 無法運作');
-                console.log('[提示] 請確認 Bot 已設定 RSC 權限: ChannelSettings.Read.Group, TeamSettings.Read.Group');
+            try {
+                console.log('[INFO] 使用 TeamsInfo API 取得頻道名稱...');
+                console.log(`[INFO] Team ID: ${channelData.teamsTeamId}`);
+                console.log(`[INFO] Channel ID: ${channelData.teamsChannelId}`);
+                
+                const channels = await TeamsInfo.getTeamChannels(context, channelData.teamsTeamId);
+                console.log(`[INFO] 取得 ${channels.length} 個頻道`);
+                
+                const currentChannel = channels.find(ch => ch.id === channelData.teamsChannelId);
+                if (!currentChannel) {
+                    console.log(`[ERROR] 在團隊的 ${channels.length} 個頻道中找不到 ID: ${channelData.teamsChannelId}`);
+                    console.log(`[DEBUG] 可用的頻道:`, JSON.stringify(channels.map(ch => ({ id: ch.id, name: ch.name })), null, 2));
+                    await next();
+                    return;
+                }
+                
+                if (!currentChannel.name) {
+                    console.log(`[ERROR] 頻道物件沒有 name 欄位:`, JSON.stringify(currentChannel, null, 2));
+                    console.log(`[ERROR] 無法取得頻道名稱,Bot 無法運作`);
+                    await next();
+                    return;
+                }
+                
+                channelName = currentChannel.name;
+                
+                console.log(`[OK] TeamsInfo API 成功取得頻道名稱: "${channelName}"`);
+                
+            } catch (error: any) {
+                console.error('[ERROR] TeamsInfo API 呼叫失敗:', error?.message || error);
+                console.error('[ERROR] 完整錯誤:', error);
                 await next();
                 return;
             }
