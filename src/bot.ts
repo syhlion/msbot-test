@@ -62,11 +62,22 @@ export class EchoBot extends ActivityHandler {
                         
                         const channels = await TeamsInfo.getTeamChannels(context, channelData.teamsTeamId);
                         console.log(`[INFO] 取得 ${channels.length} 個頻道`);
+                        console.log(`[DEBUG] 所有頻道資訊:`, JSON.stringify(channels, null, 2));
                         
                         const currentChannel = channels.find(ch => ch.id === channelData.teamsChannelId);
                         if (currentChannel) {
+                            console.log(`[DEBUG] 找到的頻道物件:`, JSON.stringify(currentChannel, null, 2));
                             channelName = currentChannel.name || '';
-                            console.log(`[OK] TeamsInfo API 成功取得頻道名稱: ${channelName}`);
+                            console.log(`[OK] TeamsInfo API 成功取得頻道名稱: "${channelName}"`);
+                            
+                            if (!channelName) {
+                                console.log(`[WARNING] 頻道名稱為空! 嘗試其他欄位...`);
+                                // 嘗試其他可能的欄位
+                                channelName = (currentChannel as any).displayName || '';
+                                if (channelName) {
+                                    console.log(`[OK] 使用 displayName: "${channelName}"`);
+                                }
+                            }
                         } else {
                             console.log(`[ERROR] 在團隊的 ${channels.length} 個頻道中找不到 ID: ${channelData.teamsChannelId}`);
                             console.log(`[DEBUG] 可用的頻道:`, channels.map(ch => ({ id: ch.id, name: ch.name })));
