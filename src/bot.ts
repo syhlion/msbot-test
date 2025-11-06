@@ -65,14 +65,17 @@ export class EchoBot extends ActivityHandler {
                 console.log(`Channel Data:`, JSON.stringify(context.activity.channelData, null, 2));
             }
 
-            // 檢查是否包含觸發關鍵字
-            const hasTriggerKeyword = userMessage.includes('遊戲商系統') || userMessage.toLowerCase().includes('sre');
-            console.log(`包含關鍵字: ${hasTriggerKeyword} (遊戲商系統:${userMessage.includes('遊戲商系統')}, SRE:${userMessage.toLowerCase().includes('sre')})`);
+            // 檢查是否包含觸發關鍵字 (需要同時包含「遊戲商系統」和「SRE」)
+            const hasGameSystem = userMessage.includes('遊戲商系統');
+            const hasSRE = userMessage.toLowerCase().includes('sre');
+            const hasBothKeywords = hasGameSystem && hasSRE;
+            
+            console.log(`包含關鍵字: 遊戲商系統=${hasGameSystem}, SRE=${hasSRE}, 兩者都有=${hasBothKeywords}`);
             console.log('='.repeat(50));
 
-            // 只要包含關鍵字就觸發表單（不需要 Tag Bot）
-            if (hasTriggerKeyword) {
-                console.log('[OK] 觸發 Adaptive Card 表單 (偵測到關鍵字)');
+            // Plan 2: 需要同時包含「遊戲商系統」和「SRE」才觸發
+            if (hasBothKeywords) {
+                console.log('[OK] 觸發 Adaptive Card 表單 (偵測到兩個關鍵字)');
                 
                 // 在發送表單前,先建立並快取訊息連結
                 const messageLink = this.buildTeamsMessageLink(context);
@@ -85,6 +88,16 @@ export class EchoBot extends ActivityHandler {
                 await this.sendRecordForm(context);
                 await next();
                 return;
+            }
+            
+            // Plan 1: 智能解析訊息內容,自動建單
+            // 如果訊息包含表格式內容,嘗試自動解析
+            if (userMessage.length > 50) { // 只處理較長的訊息
+                const autoCreateResult = await this.tryAutoCreateIssue(context, userMessage);
+                if (autoCreateResult) {
+                    await next();
+                    return;
+                }
             }
 
             // 不包含關鍵字的訊息不回應 (移除 Echo 模式)
@@ -101,10 +114,11 @@ export class EchoBot extends ActivityHandler {
                     console.log(`Bot 被安裝到: ${context.activity.conversation?.name || 'unknown'}`);
                     const welcomeText = `歡迎使用 SRE 工單記錄 Bot\n\n` +
                         `使用方式：\n` +
-                        `在訊息中提到「SRE」或「遊戲商系統」即可自動觸發表單\n\n` +
-                        `範例：\n` +
-                        `- 異常回報 SRE\n` +
-                        `- 遊戲商系統有問題`;
+                        `方式 1: 在訊息中同時提到「遊戲商系統」和「SRE」觸發表單\n` +
+                        `  範例: 遊戲商系統 SRE 異常回報\n\n` +
+                        `方式 2: 直接貼上包含環境、異常分級的訊息,Bot 會自動建單\n` +
+                        `  必要資訊: pgs-prod/pgs-stage + P0/P1/P2/P3\n` +
+                        `  範例: pgs-prod 老虎機 P2 異常`;
                     await context.sendActivity(MessageFactory.text(welcomeText));
                 }
             }
@@ -113,6 +127,190 @@ export class EchoBot extends ActivityHandler {
         });
     }
 
+
+    /**
+     * Plan 1: 嘗試自動解析訊息內容並建立工單
+     */
+    private async tryAutoCreateIssue(context: TurnContext, message: string): Promise<boolean> {
+        try {
+            console.log('[INFO] 嘗試自動解析訊息內容...');
+            
+            // 解析訊息中的關鍵資訊
+            const parsedData = this.parseMessageContent(message);
+            
+            // 檢查是否有足夠的資訊自動建單
+            if (!parsedData.environment || !parsedData.severity) {
+                console.log('[INFO] 資訊不足,無法自動建單');
+                return false;
+            }
+            
+            console.log('[OK] 偵測到足夠資訊,自動建立工單');
+            console.log('[INFO] 解析結果:', JSON.stringify(parsedData, null, 2));
+            
+            // 取得提交人資訊
+            const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
+            
+            // 產生工單號碼
+            const ticketNumber = generateTicketNumber();
+            console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
+            
+            // 建立 Teams 訊息連結
+            const issueLink = this.buildTeamsMessageLink(context);
+            
+            // 準備表單資料
+            const recordData: RecordFormData = {
+                environment: parsedData.environment,
+                product: parsedData.product || '其他',
+                issueDate: parsedData.issueDate || new Date().toISOString().split('T')[0],
+                issueTime: parsedData.issueTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
+                operation: parsedData.operation || message.substring(0, 500), // 使用原始訊息作為操作描述
+                userId: parsedData.userId,
+                betOrderId: parsedData.betOrderId,
+                errorCode: parsedData.errorCode,
+                severity: parsedData.severity,
+                submitter: submitterName
+            };
+            
+            // 寫入 Google Sheets
+            if (googleSheetService.isEnabled()) {
+                console.log('[INFO] 開始寫入 Google Sheets...');
+                const sheetRowData = mapFormDataToSheetRow(ticketNumber, recordData, issueLink);
+                
+                try {
+                    await googleSheetService.appendRow(sheetRowData);
+                    console.log(`[OK] Google Sheets 寫入成功: ${ticketNumber}`);
+                    
+                    // 顯示確認卡片
+                    await this.sendConfirmationCard(context, ticketNumber, recordData);
+                    return true;
+                    
+                } catch (sheetError: any) {
+                    console.error(`[ERROR] Google Sheets 寫入失敗: ${sheetError}`);
+                    await context.sendActivity(`❌ 自動建單失敗: ${sheetError.message}`);
+                    return false;
+                }
+            }
+            
+            return false;
+            
+        } catch (error) {
+            console.error('[ERROR] 自動建單失敗:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * 解析訊息內容,提取關鍵資訊
+     * 支援固定表格格式的解析
+     */
+    private parseMessageContent(message: string): Partial<RecordFormData> & { environment?: string; severity?: string } {
+        const result: Partial<RecordFormData> & { environment?: string; severity?: string } = {};
+        
+        console.log('[INFO] 開始解析訊息內容...');
+        
+        // 解析環境/整合商 (支援表格格式: "環境/整合商: pgs-prod / 1xbet")
+        const envMatch = message.match(/環境[\/\s]*整合商[:\s]*([^\n]+)/i);
+        if (envMatch) {
+            const envText = envMatch[1].trim();
+            if (envText.includes('pgs-prod')) result.environment = 'pgs-prod';
+            else if (envText.includes('pgs-stage')) result.environment = 'pgs-stage';
+            else if (envText.includes('1xbet')) result.environment = '1xbet';
+            console.log(`[解析] 環境/整合商: ${result.environment}`);
+        } else {
+            // Fallback: 直接搜尋關鍵字
+            if (message.includes('pgs-prod')) result.environment = 'pgs-prod';
+            else if (message.includes('pgs-stage')) result.environment = 'pgs-stage';
+            else if (message.includes('1xbet')) result.environment = '1xbet';
+        }
+        
+        // 解析產品/遊戲 (支援表格格式: "產品/遊戲: 老虎機 /")
+        const productMatch = message.match(/產品[\/\s]*遊戲[:\s]*([^\n]+)/i);
+        if (productMatch) {
+            const productText = productMatch[1].trim();
+            if (productText.includes('老虎機')) result.product = '老虎機';
+            else if (productText.includes('棋牌')) result.product = '棋牌';
+            else if (productText.includes('魚機')) result.product = '魚機';
+            console.log(`[解析] 產品/遊戲: ${result.product}`);
+        } else {
+            // Fallback
+            if (message.includes('老虎機')) result.product = '老虎機';
+            else if (message.includes('棋牌')) result.product = '棋牌';
+            else if (message.includes('魚機')) result.product = '魚機';
+        }
+        
+        // 解析發現異常時間 (支援表格格式: "發現異常時間: 2025-10-29 10:00")
+        const issueTimeMatch = message.match(/發[現生][異常]*時間[:\s]*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
+        if (issueTimeMatch) {
+            result.issueDate = `${issueTimeMatch[1]}-${issueTimeMatch[2]}-${issueTimeMatch[3]}`;
+            result.issueTime = `${issueTimeMatch[4]}:${issueTimeMatch[5]}`;
+            console.log(`[解析] 發現異常時間: ${result.issueDate} ${result.issueTime}`);
+        } else {
+            // Fallback: 一般日期時間格式
+            const dateTimeMatch = message.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+            if (dateTimeMatch) {
+                result.issueDate = `${dateTimeMatch[1]}-${dateTimeMatch[2]}-${dateTimeMatch[3]}`;
+                result.issueTime = `${dateTimeMatch[4]}:${dateTimeMatch[5]}`;
+            }
+        }
+        
+        // 解析 UserID 與 注單編號 (支援表格格式: "UserID 與 注單編號: 792f88d3-...")
+        const userIdMatch = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+        if (userIdMatch) {
+            result.userId = userIdMatch[0];
+            console.log(`[解析] UserID: ${result.userId}`);
+        }
+        
+        const betOrderMatch = message.match(/bet[0-9]+/i);
+        if (betOrderMatch) {
+            result.betOrderId = betOrderMatch[0];
+            console.log(`[解析] 注單編號: ${result.betOrderId}`);
+        }
+        
+        // 解析異常代碼 (支援表格格式: "異常代碼: ERR3331")
+        const errorCodeMatch = message.match(/異常代碼[:\s]*([A-Z0-9_]+)/i);
+        if (errorCodeMatch && errorCodeMatch[1].trim()) {
+            result.errorCode = errorCodeMatch[1].trim();
+            console.log(`[解析] 異常代碼: ${result.errorCode}`);
+        } else {
+            // Fallback: 搜尋 ERR 或 _ERROR 格式
+            const fallbackMatch = message.match(/ERR[0-9A-Z_]+|[A-Z_]+_ERROR/i);
+            if (fallbackMatch) {
+                result.errorCode = fallbackMatch[0];
+            }
+        }
+        
+        // 解析異常分級 (支援表格格式: "異常分級: P2")
+        const severityMatch = message.match(/異常分[級级][:\s]*(P[0-3])/i);
+        if (severityMatch) {
+            result.severity = severityMatch[1].toUpperCase();
+            console.log(`[解析] 異常分級: ${result.severity}`);
+        } else {
+            // Fallback
+            if (message.match(/P0|緊急/i)) result.severity = 'P0';
+            else if (message.match(/P1|高/i)) result.severity = 'P1';
+            else if (message.match(/P2|中/i)) result.severity = 'P2';
+            else if (message.match(/P3|低/i)) result.severity = 'P3';
+        }
+        
+        // 解析發生異常操作 (從表格中提取問題描述)
+        const operationMatch = message.match(/問題[:\s：]*([^\n]+)/);
+        if (operationMatch && operationMatch[1].trim()) {
+            result.operation = operationMatch[1].trim();
+            console.log(`[解析] 發生異常操作: ${result.operation}`);
+        }
+        
+        console.log('[INFO] 解析完成,結果:', JSON.stringify(result, null, 2));
+        return result;
+    }
+    
+    /**
+     * 直接發送確認卡片 (用於自動建單)
+     */
+    private async sendConfirmationCard(context: TurnContext, ticketNumber: string, data: RecordFormData): Promise<void> {
+        const confirmationCard = this.createConfirmationCard(ticketNumber, data);
+        const message = MessageFactory.attachment(confirmationCard);
+        await context.sendActivity(message);
+    }
 
     /**
      * 發送工單記錄表單 (Adaptive Card)
