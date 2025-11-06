@@ -44,11 +44,24 @@ export class EchoBot extends ActivityHandler {
 
             // 處理一般訊息
             const userMessage = context.activity.text || '';
-            const channelName = context.activity.channelData?.channel?.name || '';
+            
+            // 嘗試從多個地方取得頻道名稱
+            const channelData = context.activity.channelData || {};
+            const channelName = channelData.channel?.name || 
+                               channelData.teamsChannelId || 
+                               context.activity.conversation?.name || 
+                               '';
             
             console.log('='.repeat(50));
             console.log(`收到訊息: ${userMessage}`);
             console.log(`頻道名稱: ${channelName}`);
+            console.log(`[DEBUG] Channel Data:`, JSON.stringify({
+                channelName: channelData.channel?.name,
+                channelId: channelData.channel?.id,
+                teamsChannelId: channelData.teamsChannelId,
+                conversationName: context.activity.conversation?.name,
+                conversationId: context.activity.conversation?.id
+            }, null, 2));
             console.log('='.repeat(50));
 
             // 根據頻道名稱找到對應的配置
@@ -56,6 +69,7 @@ export class EchoBot extends ActivityHandler {
             
             if (!config) {
                 console.log(`[跳過] 頻道「${channelName}」沒有對應的配置`);
+                console.log(`[提示] 請確認頻道名稱是否包含配置中的關鍵字: ${channelConfigs.map(c => c.name).join(', ')}`);
                 await next();
                 return;
             }
