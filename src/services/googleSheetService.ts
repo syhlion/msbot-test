@@ -102,6 +102,11 @@ export class GoogleSheetService {
             }
 
             // 準備要寫入的資料列（對應 A-N 欄）
+            // J 欄（異常單連結）使用 HYPERLINK 函數來顯示超連結
+            const issueLinkFormula = data.issueLink 
+                ? `=HYPERLINK("${data.issueLink}", "查看原始訊息")` 
+                : '';
+            
             const row = [
                 data.ticketNumber,    // A: 工單編號
                 data.reportTime,      // B: 回報時間
@@ -112,18 +117,18 @@ export class GoogleSheetService {
                 data.userId,          // G: UserID
                 data.betOrderId,      // H: 注單編號
                 data.errorCode,       // I: 異常代碼
-                data.issueLink,       // J: 異常單連結
+                issueLinkFormula,     // J: 異常單連結 (HYPERLINK 公式)
                 data.priority,        // K: 優先級別
                 data.assignee,        // L: 對應人員
                 data.description,     // M: 發生原因
                 data.resolution,      // N: 處理方式
             ];
 
-            // 寫入資料到 Sheet
+            // 寫入資料到 Sheet (使用 USER_ENTERED 讓公式生效)
             const response = await this.sheets.spreadsheets.values.append({
                 spreadsheetId: this.spreadsheetId,
                 range: `${this.sheetName}!A:N`,
-                valueInputOption: 'RAW',
+                valueInputOption: 'USER_ENTERED',  // 改為 USER_ENTERED 以支援公式
                 requestBody: {
                     values: [row],
                 },
