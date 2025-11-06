@@ -234,18 +234,27 @@ export class EchoBot extends ActivityHandler {
         
         console.log('[INFO] 開始解析訊息內容...');
         
-        // 解析環境/整合商 - 直接提取後面的字串內容
-        const envMatch = message.match(/環境[\/\s]*整合商\s*\*?\s*([^\n]+)/i);
-        if (envMatch) {
-            result.environment = envMatch[1].trim();
-            console.log(`[解析] 環境/整合商: ${result.environment}`);
+        // 解析環境/整合商 - 直接提取後面的字串內容 (跳過星號)
+        const envLineMatch = message.match(/環境[\/\s]*整合商[^\n]*/i);
+        if (envLineMatch) {
+            // 從這一行中提取內容,跳過欄位名稱和星號
+            const envLine = envLineMatch[0];
+            const envContent = envLine.replace(/環境[\/\s]*整合商\s*\*?\s*/i, '').trim();
+            if (envContent) {
+                result.environment = envContent;
+                console.log(`[解析] 環境/整合商: ${result.environment}`);
+            }
         }
         
-        // 解析產品/遊戲 - 直接提取後面的字串內容
-        const productMatch = message.match(/產品[\/\s]*遊戲\s*\*?\s*([^\n]+)/i);
-        if (productMatch) {
-            result.product = productMatch[1].trim();
-            console.log(`[解析] 產品/遊戲: ${result.product}`);
+        // 解析產品/遊戲 - 直接提取後面的字串內容 (跳過星號)
+        const productLineMatch = message.match(/產品[\/\s]*遊戲[^\n]*/i);
+        if (productLineMatch) {
+            const productLine = productLineMatch[0];
+            const productContent = productLine.replace(/產品[\/\s]*遊戲\s*\*?\s*/i, '').trim();
+            if (productContent) {
+                result.product = productContent;
+                console.log(`[解析] 產品/遊戲: ${result.product}`);
+            }
         }
         
         // 解析發現異常時間 - 提取並 parse 日期時間
@@ -274,10 +283,11 @@ export class EchoBot extends ActivityHandler {
             }
         }
         
-        // 解析異常代碼 - 直接提取後面的字串內容 (可能為空)
-        const errorCodeMatch = message.match(/異常代碼\s*\*?\s*([^\n]*)/i);
-        if (errorCodeMatch) {
-            const errorCodeContent = errorCodeMatch[1].trim();
+        // 解析異常代碼 - 直接提取後面的字串內容 (跳過星號,可能為空)
+        const errorCodeLineMatch = message.match(/異常代碼[^\n]*/i);
+        if (errorCodeLineMatch) {
+            const errorCodeLine = errorCodeLineMatch[0];
+            const errorCodeContent = errorCodeLine.replace(/異常代碼\s*\*?\s*/i, '').trim();
             if (errorCodeContent) {
                 result.errorCode = errorCodeContent;
                 console.log(`[解析] 異常代碼: ${result.errorCode}`);
@@ -286,11 +296,15 @@ export class EchoBot extends ActivityHandler {
             }
         }
         
-        // 解析異常分級 - 直接提取後面的字串內容
-        const severityMatch = message.match(/異常分[級级]\s*\*?\s*([^\n]+)/i);
-        if (severityMatch) {
-            result.severity = severityMatch[1].trim();
-            console.log(`[解析] 異常分級: ${result.severity}`);
+        // 解析異常分級 - 直接提取後面的字串內容 (跳過星號)
+        const severityLineMatch = message.match(/異常分[級级][^\n]*/i);
+        if (severityLineMatch) {
+            const severityLine = severityLineMatch[0];
+            const severityContent = severityLine.replace(/異常分[級级]\s*\*?\s*/i, '').trim();
+            if (severityContent) {
+                result.severity = severityContent;
+                console.log(`[解析] 異常分級: ${result.severity}`);
+            }
         }
         
         // 解析發生異常操作 - 直接提取「問題」後面的內容
