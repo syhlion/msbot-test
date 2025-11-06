@@ -133,21 +133,23 @@ export class EchoBot extends ActivityHandler {
 
     /**
      * Plan 1: 嘗試自動解析訊息內容並建立工單
+     * 簡化邏輯: 只要偵測到表格格式,就自動建單
      */
     private async tryAutoCreateIssue(context: TurnContext, message: string): Promise<boolean> {
         try {
             console.log('[INFO] 嘗試自動解析訊息內容...');
             
-            // 解析訊息中的關鍵資訊
-            const parsedData = this.parseMessageContent(message);
-            
-            // 檢查是否有足夠的資訊自動建單
-            if (!parsedData.environment || !parsedData.severity) {
-                console.log('[INFO] 資訊不足,無法自動建單');
+            // 檢查是否包含表格格式的關鍵欄位名稱
+            const hasTableFormat = this.detectTableFormat(message);
+            if (!hasTableFormat) {
+                console.log('[INFO] 未偵測到表格格式,跳過自動建單');
                 return false;
             }
             
-            console.log('[OK] 偵測到足夠資訊,自動建立工單');
+            console.log('[OK] 偵測到表格格式,開始自動建單');
+            
+            // 解析訊息中的資訊
+            const parsedData = this.parseMessageContent(message);
             console.log('[INFO] 解析結果:', JSON.stringify(parsedData, null, 2));
             
             // 取得提交人資訊
@@ -160,17 +162,17 @@ export class EchoBot extends ActivityHandler {
             // 建立 Teams 訊息連結
             const issueLink = this.buildTeamsMessageLink(context);
             
-            // 準備表單資料
+            // 準備表單資料 (空白欄位使用預設值或留空)
             const recordData: RecordFormData = {
-                environment: parsedData.environment,
+                environment: parsedData.environment || '未知環境',
                 product: parsedData.product || '其他',
                 issueDate: parsedData.issueDate || new Date().toISOString().split('T')[0],
                 issueTime: parsedData.issueTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
-                operation: parsedData.operation || message.substring(0, 500), // 使用原始訊息作為操作描述
+                operation: parsedData.operation || '(請參考原始訊息)',
                 userId: parsedData.userId,
                 betOrderId: parsedData.betOrderId,
                 errorCode: parsedData.errorCode,
-                severity: parsedData.severity,
+                severity: parsedData.severity || 'P2', // 預設 P2
                 submitter: submitterName
             };
             
@@ -200,6 +202,27 @@ export class EchoBot extends ActivityHandler {
             console.error('[ERROR] 自動建單失敗:', error);
             return false;
         }
+    }
+    
+    /**
+     * 偵測是否為表格格式
+     * 只要包含關鍵欄位名稱,就視為表格格式
+     */
+    private detectTableFormat(message: string): boolean {
+        // 定義表格必要的欄位名稱
+        const requiredFields = [
+            /環境[\/\s]*整合商/i,
+            /產品[\/\s]*遊戲/i,
+            /異常分[級级]/i
+        ];
+        
+        // 檢查是否至少包含這些欄位
+        const matchCount = requiredFields.filter(pattern => pattern.test(message)).length;
+        
+        console.log(`[INFO] 表格欄位偵測: 找到 ${matchCount}/${requiredFields.length} 個必要欄位`);
+        
+        // 至少要有 2 個欄位才視為表格格式
+        return matchCount >= 2;
     }
     
     /**
@@ -277,18 +300,27 @@ export class EchoBot extends ActivityHandler {
             console.log(`[解析] 注單編號: ${result.betOrderId}`);
         }
         
-        // 解析異常代碼 (支援表格格式: "異常代碼 * ERR3331" 或留空)
-        const errorCodeMatch = message.match(/異常代碼[*\s:：]*([A-Z0-9_]+)/i);
-        if (errorCodeMatch && errorCodeMatch[1].trim()) {
-            result.errorCode = errorCodeMatch[1].trim();
-            console.log(`[解析] 異常代碼: ${result.errorCode}`);
-        } else {
-            // Fallback: 搜尋 ERR 或 _ERROR 格式
-            const fallbackMatch = message.match(/ERR[0-9A-Z_]+|[A-Z_]+_ERROR|RS_ERROR[A-Z_]*/i);
-            if (fallbackMatch) {
-                result.errorCode = fallbackMatch[0];
-                console.log(`[解析] 異常代碼 (Fallback): ${result.errorCode}`);
+        // 解析異常代碼 (支援表格格式: "異常代碼 * ERR3331")
+        // 注意: 如果表格中該欄位是空的,就不填寫 (不使用 Fallback 避免誤判異常狀況說明中的錯誤代碼)
+        // 只在「異常代碼」這一行有實際內容時才提取
+        const errorCodeLineMatch = message.match(/異常代碼[*\s:：]*([^\n]*)/i);
+        if (errorCodeLineMatch) {
+            const errorCodeContent = errorCodeLineMatch[1].trim();
+            // 檢查該行是否有實際內容 (至少2個字元,且不全是空白)
+            if (errorCodeContent && errorCodeContent.length >= 2) {
+                // 提取實際的錯誤代碼 (字母、數字、底線組成)
+                const codeMatch = errorCodeContent.match(/^([A-Z0-9_]+)/i);
+                if (codeMatch) {
+                    result.errorCode = codeMatch[1];
+                    console.log(`[解析] 異常代碼: ${result.errorCode}`);
+                } else {
+                    console.log(`[解析] 異常代碼: (欄位為空)`);
+                }
+            } else {
+                console.log(`[解析] 異常代碼: (欄位為空)`);
             }
+        } else {
+            console.log(`[解析] 異常代碼: (欄位為空)`);
         }
         
         // 解析異常分級 (支援表格格式: "異常分級 * P2")
