@@ -234,63 +234,70 @@ export class EchoBot extends ActivityHandler {
         
         console.log('[INFO] 開始解析訊息內容...');
         
-        // 解析環境/整合商 - 提取欄位後的內容 (可能在同一行或下一行)
-        const envMatch = message.match(/環境[\/\s]*整合商\s*\*?\s*\n?\s*([^\n]+)/i);
-        if (envMatch && envMatch[1].trim()) {
-            result.environment = envMatch[1].trim();
-            console.log(`[解析] 環境/整合商: ${result.environment}`);
+        // 解析環境/整合商 - 提取欄位後的第一個非空行 (支援全形/半形星號、多個空行)
+        const envSection = message.match(/環境[\/\s]*整合商[\s\*＊]*([\s\S]*?)(?=產品|發現|UserID|異常|$)/i);
+        if (envSection) {
+            // 從這一段中提取第一個非空行
+            const lines = envSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.environment = contentLine.trim();
+                console.log(`[解析] 環境/整合商: ${result.environment}`);
+            }
         }
         
-        // 解析產品/遊戲 - 提取欄位後的內容 (可能在同一行或下一行)
-        const productMatch = message.match(/產品[\/\s]*遊戲\s*\*?\s*\n?\s*([^\n]+)/i);
-        if (productMatch && productMatch[1].trim()) {
-            result.product = productMatch[1].trim();
-            console.log(`[解析] 產品/遊戲: ${result.product}`);
+        // 解析產品/遊戲 - 提取欄位後的第一個非空行
+        const productSection = message.match(/產品[\/\s]*遊戲[\s\*＊]*([\s\S]*?)(?=發現|UserID|異常|$)/i);
+        if (productSection) {
+            const lines = productSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.product = contentLine.trim();
+                console.log(`[解析] 產品/遊戲: ${result.product}`);
+            }
         }
         
-        // 解析發現異常時間 - 提取並 parse 日期時間 (可能在同一行或下一行)
-        const issueTimeMatch = message.match(/發[現生][異常]*時間\s*\*?\s*\n?\s*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
+        // 解析發現異常時間 - 提取並 parse 日期時間 (支援全形星號、多個空行)
+        const issueTimeMatch = message.match(/發[現生][異常]*時間[\s\*＊]*[\s\S]*?(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
         if (issueTimeMatch) {
             result.issueDate = `${issueTimeMatch[1]}-${issueTimeMatch[2]}-${issueTimeMatch[3]}`;
             result.issueTime = `${issueTimeMatch[4]}:${issueTimeMatch[5]}`;
             console.log(`[解析] 發現異常時間: ${result.issueDate} ${result.issueTime}`);
         }
         
-        // 解析 UserID 與 注單編號 - 提取欄位後的內容 (可能在同一行或下一行)
-        const userIdLineMatch = message.match(/UserID\s*與\s*注單編號\s*\*?\s*\n?\s*([^\n]+)/i);
-        if (userIdLineMatch) {
-            const userIdContent = userIdLineMatch[1].trim();
-            // 嘗試從這一行提取 UUID 格式的 UserID
-            const uuidMatch = userIdContent.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-            if (uuidMatch) {
-                result.userId = uuidMatch[0];
-                console.log(`[解析] UserID: ${result.userId}`);
-            }
-            // 嘗試從這一行提取注單編號
-            const betMatch = userIdContent.match(/bet[0-9]+/i);
-            if (betMatch) {
-                result.betOrderId = betMatch[0];
-                console.log(`[解析] 注單編號: ${result.betOrderId}`);
+        // 解析 UserID 與 注單編號 - 直接提取後面的字串內容 (支援全形星號、多個空行)
+        const userIdSection = message.match(/UserID\s*與\s*注單編號[\s\*＊]*([\s\S]*?)(?=異常代碼|異常單|異常分|$)/i);
+        if (userIdSection) {
+            const lines = userIdSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.userId = contentLine.trim();
+                console.log(`[解析] UserID 與 注單編號: ${result.userId}`);
             }
         }
         
-        // 解析異常代碼 - 提取欄位後的內容 (可能在同一行或下一行,可能為空)
-        const errorCodeMatch = message.match(/異常代碼\s*\*?\s*\n?\s*([^\n]*)/i);
-        if (errorCodeMatch) {
-            const errorCodeContent = errorCodeMatch[1].trim();
-            if (errorCodeContent) {
-                result.errorCode = errorCodeContent;
+        // 解析異常代碼 - 提取欄位後的第一個非空行 (支援全形星號,可能為空)
+        const errorCodeSection = message.match(/異常代碼[\s\*＊]*([\s\S]*?)(?=異常單|異常分|$)/i);
+        if (errorCodeSection) {
+            const lines = errorCodeSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.errorCode = contentLine.trim();
                 console.log(`[解析] 異常代碼: ${result.errorCode}`);
             } else {
                 console.log(`[解析] 異常代碼: (欄位為空)`);
             }
         }
         
-        // 解析異常分級 - 提取欄位後的內容 (可能在同一行或下一行)
-        const severityMatch = message.match(/異常分[級级]\s*\*?\s*\n?\s*([^\n]+)/i);
-        if (severityMatch && severityMatch[1].trim()) {
-            result.severity = severityMatch[1].trim();
-            console.log(`[解析] 異常分級: ${result.severity}`);
+        // 解析異常分級 - 提取欄位後的第一個非空行 (支援全形星號)
+        const severitySection = message.match(/異常分[級级][\s\*＊]*([\s\S]*?)(?=問題|$)/i);
+        if (severitySection) {
+            const lines = severitySection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.severity = contentLine.trim();
+                console.log(`[解析] 異常分級: ${result.severity}`);
+            }
         }
         
         // 解析發生異常操作 - 直接提取「問題」後面的內容
