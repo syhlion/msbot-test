@@ -1,4 +1,4 @@
-import { ActivityHandler, TurnContext, MessageFactory } from 'botbuilder';
+import { ActivityHandler, TurnContext, MessageFactory, TeamsInfo } from 'botbuilder';
 import { getChannelConfig, hasRequiredKeywords, channelConfigs } from './config/channelConfig';
 import { BaseChannelHandler } from './handlers/BaseChannelHandler';
 import { IssueChannelHandler } from './handlers/IssueChannelHandler';
@@ -47,10 +47,33 @@ export class EchoBot extends ActivityHandler {
             
             // 嘗試從多個地方取得頻道名稱
             const channelData = context.activity.channelData || {};
-            const channelName = channelData.channel?.name || 
-                               channelData.teamsChannelId || 
-                               context.activity.conversation?.name || 
-                               '';
+            let channelName = channelData.channel?.name || 
+                             context.activity.conversation?.name || 
+                             '';
+            
+            // 使用 TeamsInfo API 取得頻道詳細資訊 (包括中文名稱)
+            if (!channelName && channelData.teamsTeamId && channelData.teamsChannelId) {
+                try {
+                    console.log('[INFO] 嘗試使用 TeamsInfo API 取得頻道名稱...');
+                    const channels = await TeamsInfo.getTeamChannels(context, channelData.teamsTeamId);
+                    const currentChannel = channels.find(ch => ch.id === channelData.teamsChannelId);
+                    if (currentChannel) {
+                        channelName = currentChannel.name || '';
+                        console.log(`[OK] TeamsInfo API 成功取得頻道名稱: ${channelName}`);
+                    } else {
+                        console.log(`[WARNING] 在團隊中找不到頻道 ID: ${channelData.teamsChannelId}`);
+                    }
+                } catch (error) {
+                    console.error('[ERROR] TeamsInfo API 呼叫失敗:', error);
+                    // 降級: 使用 channelId 作為名稱
+                    channelName = channelData.teamsChannelId || '';
+                }
+            }
+            
+            // 如果還是沒有名稱,使用 channelId
+            if (!channelName) {
+                channelName = channelData.teamsChannelId || '';
+            }
             
             console.log('='.repeat(50));
             console.log(`收到訊息: ${userMessage}`);
