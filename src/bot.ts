@@ -162,17 +162,17 @@ export class EchoBot extends ActivityHandler {
             // 建立 Teams 訊息連結
             const issueLink = this.buildTeamsMessageLink(context);
             
-            // 準備表單資料 (空白欄位使用預設值或留空)
+            // 準備表單資料 (直接使用解析結果,空白就留空)
             const recordData: RecordFormData = {
-                environment: parsedData.environment || '未知環境',
-                product: parsedData.product || '其他',
+                environment: parsedData.environment || '',
+                product: parsedData.product || '',
                 issueDate: parsedData.issueDate || new Date().toISOString().split('T')[0],
                 issueTime: parsedData.issueTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
-                operation: parsedData.operation || '(請參考原始訊息)',
+                operation: parsedData.operation || '',
                 userId: parsedData.userId,
                 betOrderId: parsedData.betOrderId,
                 errorCode: parsedData.errorCode,
-                severity: parsedData.severity || 'P2', // 預設 P2
+                severity: parsedData.severity || '',
                 submitter: submitterName
             };
             
@@ -234,114 +234,68 @@ export class EchoBot extends ActivityHandler {
         
         console.log('[INFO] 開始解析訊息內容...');
         
-        // 解析環境/整合商 (支援表格格式: "環境/整合商 * pgs-prod / 1xbet" 或 "環境/整合商: pgs-prod")
-        // 使用更寬鬆的正則表達式,支援星號和多種分隔符
-        const envMatch = message.match(/環境[\/\s]*整合商[*\s:：]*([^\n]+)/i);
+        // 解析環境/整合商 - 直接提取後面的字串內容
+        const envMatch = message.match(/環境[\/\s]*整合商\s*\*?\s*([^\n]+)/i);
         if (envMatch) {
-            const envText = envMatch[1].trim();
-            console.log(`[解析 DEBUG] 找到環境欄位內容: "${envText}"`);
-            if (envText.includes('pgs-prod')) result.environment = 'pgs-prod';
-            else if (envText.includes('pgs-stage')) result.environment = 'pgs-stage';
-            else if (envText.includes('1xbet')) result.environment = '1xbet';
+            result.environment = envMatch[1].trim();
             console.log(`[解析] 環境/整合商: ${result.environment}`);
-        } else {
-            // Fallback: 直接搜尋關鍵字
-            console.log('[解析 DEBUG] 未找到環境欄位,使用 Fallback 搜尋');
-            if (message.includes('pgs-prod')) result.environment = 'pgs-prod';
-            else if (message.includes('pgs-stage')) result.environment = 'pgs-stage';
-            else if (message.includes('1xbet')) result.environment = '1xbet';
-            if (result.environment) {
-                console.log(`[解析] 環境/整合商 (Fallback): ${result.environment}`);
-            }
         }
         
-        // 解析產品/遊戲 (支援表格格式: "產品/遊戲 * 老虎機 /" 或 "產品/遊戲: 老虎機")
-        const productMatch = message.match(/產品[\/\s]*遊戲[*\s:：]*([^\n]+)/i);
+        // 解析產品/遊戲 - 直接提取後面的字串內容
+        const productMatch = message.match(/產品[\/\s]*遊戲\s*\*?\s*([^\n]+)/i);
         if (productMatch) {
-            const productText = productMatch[1].trim();
-            if (productText.includes('老虎機')) result.product = '老虎機';
-            else if (productText.includes('棋牌')) result.product = '棋牌';
-            else if (productText.includes('魚機')) result.product = '魚機';
-            if (result.product) {
-                console.log(`[解析] 產品/遊戲: ${result.product}`);
-            }
-        } else {
-            // Fallback
-            if (message.includes('老虎機')) result.product = '老虎機';
-            else if (message.includes('棋牌')) result.product = '棋牌';
-            else if (message.includes('魚機')) result.product = '魚機';
+            result.product = productMatch[1].trim();
+            console.log(`[解析] 產品/遊戲: ${result.product}`);
         }
         
-        // 解析發現異常時間 (支援表格格式: "發現異常時間 * 2025-10-29 10:00")
-        const issueTimeMatch = message.match(/發[現生][異常]*時間[*\s:：]*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
+        // 解析發現異常時間 - 提取並 parse 日期時間
+        const issueTimeMatch = message.match(/發[現生][異常]*時間\s*\*?\s*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
         if (issueTimeMatch) {
             result.issueDate = `${issueTimeMatch[1]}-${issueTimeMatch[2]}-${issueTimeMatch[3]}`;
             result.issueTime = `${issueTimeMatch[4]}:${issueTimeMatch[5]}`;
             console.log(`[解析] 發現異常時間: ${result.issueDate} ${result.issueTime}`);
-        } else {
-            // Fallback: 一般日期時間格式
-            const dateTimeMatch = message.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
-            if (dateTimeMatch) {
-                result.issueDate = `${dateTimeMatch[1]}-${dateTimeMatch[2]}-${dateTimeMatch[3]}`;
-                result.issueTime = `${dateTimeMatch[4]}:${dateTimeMatch[5]}`;
+        }
+        
+        // 解析 UserID 與 注單編號 - 直接提取後面的字串內容
+        const userIdLineMatch = message.match(/UserID\s*與\s*注單編號\s*\*?\s*([^\n]+)/i);
+        if (userIdLineMatch) {
+            const userIdContent = userIdLineMatch[1].trim();
+            // 嘗試從這一行提取 UUID 格式的 UserID
+            const uuidMatch = userIdContent.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+            if (uuidMatch) {
+                result.userId = uuidMatch[0];
+                console.log(`[解析] UserID: ${result.userId}`);
+            }
+            // 嘗試從這一行提取注單編號
+            const betMatch = userIdContent.match(/bet[0-9]+/i);
+            if (betMatch) {
+                result.betOrderId = betMatch[0];
+                console.log(`[解析] 注單編號: ${result.betOrderId}`);
             }
         }
         
-        // 解析 UserID 與 注單編號 (支援表格格式: "UserID 與 注單編號: 792f88d3-...")
-        const userIdMatch = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-        if (userIdMatch) {
-            result.userId = userIdMatch[0];
-            console.log(`[解析] UserID: ${result.userId}`);
-        }
-        
-        const betOrderMatch = message.match(/bet[0-9]+/i);
-        if (betOrderMatch) {
-            result.betOrderId = betOrderMatch[0];
-            console.log(`[解析] 注單編號: ${result.betOrderId}`);
-        }
-        
-        // 解析異常代碼 (支援表格格式: "異常代碼 * ERR3331")
-        // 注意: 如果表格中該欄位是空的,就不填寫 (不使用 Fallback 避免誤判異常狀況說明中的錯誤代碼)
-        // 只在「異常代碼」這一行有實際內容時才提取
-        const errorCodeLineMatch = message.match(/異常代碼[*\s:：]*([^\n]*)/i);
-        if (errorCodeLineMatch) {
-            const errorCodeContent = errorCodeLineMatch[1].trim();
-            // 檢查該行是否有實際內容 (至少2個字元,且不全是空白)
-            if (errorCodeContent && errorCodeContent.length >= 2) {
-                // 提取實際的錯誤代碼 (字母、數字、底線組成)
-                const codeMatch = errorCodeContent.match(/^([A-Z0-9_]+)/i);
-                if (codeMatch) {
-                    result.errorCode = codeMatch[1];
-                    console.log(`[解析] 異常代碼: ${result.errorCode}`);
-                } else {
-                    console.log(`[解析] 異常代碼: (欄位為空)`);
-                }
+        // 解析異常代碼 - 直接提取後面的字串內容 (可能為空)
+        const errorCodeMatch = message.match(/異常代碼\s*\*?\s*([^\n]*)/i);
+        if (errorCodeMatch) {
+            const errorCodeContent = errorCodeMatch[1].trim();
+            if (errorCodeContent) {
+                result.errorCode = errorCodeContent;
+                console.log(`[解析] 異常代碼: ${result.errorCode}`);
             } else {
                 console.log(`[解析] 異常代碼: (欄位為空)`);
             }
-        } else {
-            console.log(`[解析] 異常代碼: (欄位為空)`);
         }
         
-        // 解析異常分級 (支援表格格式: "異常分級 * P2")
-        const severityMatch = message.match(/異常分[級级][*\s:：]*(P[0-3])/i);
+        // 解析異常分級 - 直接提取後面的字串內容
+        const severityMatch = message.match(/異常分[級级]\s*\*?\s*([^\n]+)/i);
         if (severityMatch) {
-            result.severity = severityMatch[1].toUpperCase();
+            result.severity = severityMatch[1].trim();
             console.log(`[解析] 異常分級: ${result.severity}`);
-        } else {
-            // Fallback
-            if (message.match(/P0|緊急/i)) result.severity = 'P0';
-            else if (message.match(/P1|高/i)) result.severity = 'P1';
-            else if (message.match(/P2|中/i)) result.severity = 'P2';
-            else if (message.match(/P3|低/i)) result.severity = 'P3';
-            if (result.severity) {
-                console.log(`[解析] 異常分級 (Fallback): ${result.severity}`);
-            }
         }
         
-        // 解析發生異常操作 (從表格中提取問題描述)
-        const operationMatch = message.match(/問題[:\s：]*([^\n]+)/);
-        if (operationMatch && operationMatch[1].trim()) {
+        // 解析發生異常操作 - 直接提取「問題」後面的內容
+        const operationMatch = message.match(/問題\s*[:\s：]*([^\n]+)/);
+        if (operationMatch) {
             result.operation = operationMatch[1].trim();
             console.log(`[解析] 發生異常操作: ${result.operation}`);
         }
