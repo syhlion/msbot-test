@@ -73,9 +73,22 @@ export class EchoBot extends ActivityHandler {
             console.log(`包含關鍵字: 遊戲商系統=${hasGameSystem}, SRE=${hasSRE}, 兩者都有=${hasBothKeywords}`);
             console.log('='.repeat(50));
 
-            // Plan 2: 需要同時包含「遊戲商系統」和「SRE」才觸發
+            // 如果包含關鍵字,處理工單
             if (hasBothKeywords) {
-                console.log('[OK] 觸發 Adaptive Card 表單 (偵測到兩個關鍵字)');
+                // Plan 1: 優先嘗試自動建單 (如果訊息包含足夠資訊)
+                if (userMessage.length > 50) {
+                    console.log('[INFO] 嘗試自動建單模式...');
+                    const autoCreateResult = await this.tryAutoCreateIssue(context, userMessage);
+                    if (autoCreateResult) {
+                        console.log('[OK] 自動建單成功');
+                        await next();
+                        return;
+                    }
+                    console.log('[INFO] 自動建單失敗,切換到表單模式');
+                }
+                
+                // Plan 2: 如果無法自動建單,顯示表單讓使用者手動填寫
+                console.log('[OK] 觸發 Adaptive Card 表單 (手動填寫模式)');
                 
                 // 在發送表單前,先建立並快取訊息連結
                 const messageLink = this.buildTeamsMessageLink(context);
@@ -88,16 +101,6 @@ export class EchoBot extends ActivityHandler {
                 await this.sendRecordForm(context);
                 await next();
                 return;
-            }
-            
-            // Plan 1: 智能解析訊息內容,自動建單
-            // 如果訊息包含表格式內容,嘗試自動解析
-            if (userMessage.length > 50) { // 只處理較長的訊息
-                const autoCreateResult = await this.tryAutoCreateIssue(context, userMessage);
-                if (autoCreateResult) {
-                    await next();
-                    return;
-                }
             }
 
             // 不包含關鍵字的訊息不回應 (移除 Echo 模式)
