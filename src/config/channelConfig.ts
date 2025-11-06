@@ -16,9 +16,6 @@ export interface ChannelConfig {
     
     /** 描述 */
     description?: string;
-    
-    /** 允許的頻道 ID 白名單 (可選,如果設定則只在這些頻道中運作) */
-    allowedChannelIds?: string[];
 }
 
 /**
@@ -31,10 +28,7 @@ export const channelConfigs: ChannelConfig[] = [
         keywords: ['遊戲商系統', 'SRE'],
         sheetId: process.env.GOOGLE_SHEET_ID || '',
         sheetName: process.env.GOOGLE_SHEET_NAME || '異常工單',
-        description: '異常回報處理 (Issue/Bug Tracking)',
-        // 暫時使用頻道 ID 白名單 (如果頻道名稱無法正確取得)
-        // 請將下方註解取消,並替換為你的頻道 ID
-        // allowedChannelIds: ['19:-XowN2vJvgG4ZPcpoaykHXtOkTCcTtEudC0erJt2o9U1@thread.tacv2']
+        description: '異常回報處理 (Issue/Bug Tracking)'
     },
     
     // 未來擴充範例:
@@ -55,29 +49,18 @@ export const channelConfigs: ChannelConfig[] = [
 ];
 
 /**
- * 根據頻道名稱或頻道 ID 獲取對應的配置
- * @param channelName 頻道名稱 (可能包含中文或頻道 ID)
- * @param channelId 頻道 ID (用於白名單匹配)
+ * 根據頻道名稱獲取對應的配置
+ * @param channelName 頻道名稱 (中文名稱)
  * @returns 對應的頻道配置,如果沒有匹配則返回 null
  */
-export function getChannelConfig(channelName: string, channelId?: string): ChannelConfig | null {
-    return channelConfigs.find(config => {
-        // 優先檢查頻道 ID 白名單
-        if (config.allowedChannelIds && config.allowedChannelIds.length > 0 && channelId) {
-            const isAllowed = config.allowedChannelIds.includes(channelId);
-            if (isAllowed) {
-                console.log(`[匹配] 頻道 ID「${channelId}」在配置「${config.name}」的白名單中`);
-                return true;
-            }
-        }
-        
-        // 降級: 檢查頻道名稱是否包含配置的 name
-        const matchByName = channelName.includes(config.name);
-        if (matchByName) {
-            console.log(`[匹配] 頻道名稱「${channelName}」包含配置「${config.name}」`);
-        }
-        return matchByName;
-    }) || null;
+export function getChannelConfig(channelName: string): ChannelConfig | null {
+    const config = channelConfigs.find(config => channelName.includes(config.name));
+    
+    if (config) {
+        console.log(`[匹配] 頻道名稱「${channelName}」包含配置「${config.name}」`);
+    }
+    
+    return config || null;
 }
 
 /**

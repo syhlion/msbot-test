@@ -52,27 +52,43 @@ export class EchoBot extends ActivityHandler {
                              '';
             
             // 使用 TeamsInfo API 取得頻道詳細資訊 (包括中文名稱)
-            if (!channelName && channelData.teamsTeamId && channelData.teamsChannelId) {
-                try {
-                    console.log('[INFO] 嘗試使用 TeamsInfo API 取得頻道名稱...');
-                    const channels = await TeamsInfo.getTeamChannels(context, channelData.teamsTeamId);
-                    const currentChannel = channels.find(ch => ch.id === channelData.teamsChannelId);
-                    if (currentChannel) {
-                        channelName = currentChannel.name || '';
-                        console.log(`[OK] TeamsInfo API 成功取得頻道名稱: ${channelName}`);
-                    } else {
-                        console.log(`[WARNING] 在團隊中找不到頻道 ID: ${channelData.teamsChannelId}`);
+            // 只要沒有明確的中文名稱,就嘗試呼叫 API
+            if (!channelName || channelName.includes('@thread.tacv2')) {
+                if (channelData.teamsTeamId && channelData.teamsChannelId) {
+                    try {
+                        console.log('[INFO] 嘗試使用 TeamsInfo API 取得頻道名稱...');
+                        console.log(`[INFO] Team ID: ${channelData.teamsTeamId}`);
+                        console.log(`[INFO] Channel ID: ${channelData.teamsChannelId}`);
+                        
+                        const channels = await TeamsInfo.getTeamChannels(context, channelData.teamsTeamId);
+                        console.log(`[INFO] 取得 ${channels.length} 個頻道`);
+                        
+                        const currentChannel = channels.find(ch => ch.id === channelData.teamsChannelId);
+                        if (currentChannel) {
+                            channelName = currentChannel.name || '';
+                            console.log(`[OK] TeamsInfo API 成功取得頻道名稱: ${channelName}`);
+                        } else {
+                            console.log(`[ERROR] 在團隊的 ${channels.length} 個頻道中找不到 ID: ${channelData.teamsChannelId}`);
+                            console.log(`[DEBUG] 可用的頻道:`, channels.map(ch => ({ id: ch.id, name: ch.name })));
+                            channelName = '';
+                        }
+                    } catch (error: any) {
+                        console.error('[ERROR] TeamsInfo API 呼叫失敗:', error?.message || error);
+                        console.error('[ERROR] 完整錯誤:', error);
+                        channelName = '';
                     }
-                } catch (error) {
-                    console.error('[ERROR] TeamsInfo API 呼叫失敗:', error);
-                    // 降級: 使用 channelId 作為名稱
-                    channelName = channelData.teamsChannelId || '';
+                } else {
+                    console.log('[ERROR] 缺少 Team ID 或 Channel ID,無法呼叫 TeamsInfo API');
+                    channelName = '';
                 }
             }
             
-            // 如果還是沒有名稱,使用 channelId
+            // 如果無法取得頻道名稱,直接跳過
             if (!channelName) {
-                channelName = channelData.teamsChannelId || '';
+                console.log('[ERROR] 無法取得頻道名稱,Bot 無法運作');
+                console.log('[提示] 請確認 Bot 已設定 RSC 權限: ChannelSettings.Read.Group, TeamSettings.Read.Group');
+                await next();
+                return;
             }
             
             console.log('='.repeat(50));
@@ -93,14 +109,12 @@ export class EchoBot extends ActivityHandler {
             console.log(`[DEBUG] 完整 channelData:`, JSON.stringify(channelData, null, 2));
             console.log('='.repeat(50));
 
-            // 根據頻道名稱或頻道 ID 找到對應的配置
-            const channelId = channelData.teamsChannelId || channelData.channel?.id || '';
-            const config = getChannelConfig(channelName, channelId);
+            // 根據頻道名稱找到對應的配置
+            const config = getChannelConfig(channelName);
             
             if (!config) {
-                console.log(`[跳過] 頻道「${channelName}」(ID: ${channelId}) 沒有對應的配置`);
+                console.log(`[跳過] 頻道「${channelName}」沒有對應的配置`);
                 console.log(`[提示] 請確認頻道名稱是否包含配置中的關鍵字: ${channelConfigs.map(c => c.name).join(', ')}`);
-                console.log(`[提示] 或者將此頻道 ID 加入白名單: allowedChannelIds: ['${channelId}']`);
                 await next();
                 return;
             }
