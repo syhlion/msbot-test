@@ -19,6 +19,18 @@ export interface ChannelConfig {
 }
 
 /**
+ * Google Sheets 設定
+ * 統一在此處管理,不再依賴環境變數
+ */
+const GOOGLE_SHEETS_CONFIG = {
+    sheetId: process.env.GOOGLE_SHEET_ID || '',  // 仍從環境變數讀取 Sheet ID
+    issueSheetName: '工作表1',  // 異常工單的工作表名稱 (hardcoded)
+    // 未來可以新增其他工作表
+    // requirementSheetName: '需求清單',
+    // releaseSheetName: '上版記錄',
+};
+
+/**
  * 頻道配置清單
  * 當需要新增頻道時,在此新增配置即可
  */
@@ -26,8 +38,8 @@ export const channelConfigs: ChannelConfig[] = [
     {
         name: '異常',
         keywords: ['遊戲商系統', 'SRE'],
-        sheetId: process.env.GOOGLE_SHEET_ID || '',
-        sheetName: process.env.GOOGLE_SHEET_NAME || '異常工單',
+        sheetId: GOOGLE_SHEETS_CONFIG.sheetId,
+        sheetName: GOOGLE_SHEETS_CONFIG.issueSheetName,
         description: '異常回報處理 (Issue/Bug Tracking)'
     },
     
