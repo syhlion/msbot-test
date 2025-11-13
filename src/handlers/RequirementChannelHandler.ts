@@ -347,7 +347,7 @@ export class RequirementChannelHandler extends BaseChannelHandler {
                     type: 'Input.Text',
                     id: 'contact',
                     label: '聯絡窗口 *',
-                    placeholder: '例如：siya.li(李雯凤)',
+                    placeholder: '例如：Ned Lee(李文倫)',
                     isRequired: true,
                     errorMessage: '請輸入聯絡窗口'
                 },
