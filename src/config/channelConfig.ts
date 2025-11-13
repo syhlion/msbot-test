@@ -26,7 +26,7 @@ const GOOGLE_SHEETS_CONFIG = {
     sheetId: process.env.GOOGLE_SHEET_ID || '',  // 仍從環境變數讀取 Sheet ID
     issueSheetName: '工作表1',  // 異常工單的工作表名稱 (hardcoded)
     requirementSheetId: process.env.REQUIREMENT_SHEET_ID || '',  // 需求單 Sheet ID
-    requirementSheetName: '需求清單',  // 需求單的工作表名稱
+    requirementSheetName: '需求',  // 需求單的工作表名稱
     // 未來可以新增其他工作表
     // releaseSheetName: '上版記錄',
 };
@@ -90,7 +90,7 @@ export function getChannelConfig(channelName: string): ChannelConfig | null {
     });
     
 
-    
+
     if (config) {
         console.log(`[匹配] 頻道名稱「${channelName}」匹配配置「${config.name}」`);
     }
