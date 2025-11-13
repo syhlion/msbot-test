@@ -2,6 +2,7 @@ import { ActivityHandler, TurnContext, MessageFactory, TeamsInfo } from 'botbuil
 import { getChannelConfig, hasRequiredKeywords, channelConfigs } from './config/channelConfig';
 import { BaseChannelHandler } from './handlers/BaseChannelHandler';
 import { IssueChannelHandler } from './handlers/IssueChannelHandler';
+import { RequirementChannelHandler } from './handlers/RequirementChannelHandler';
 
 /**
  * Bot 路由器
@@ -33,11 +34,21 @@ export class EchoBot extends ActivityHandler {
                     return;
                 }
 
-                // 路由到對應的 Handler
-                // TODO: 未來需要根據表單類型路由到不同 Handler
-                const handler = this.channelHandlers.get('異常');
+                // 根據表單類型路由到對應的 Handler
+                const formType = submitData.formType || 'issue'; // 預設為異常單
+                console.log(`[INFO] 表單類型: ${formType}`);
+                
+                let handlerKey = '異常';
+                if (formType === 'requirement') {
+                    handlerKey = '需求';
+                }
+                
+                const handler = this.channelHandlers.get(handlerKey);
                 if (handler) {
+                    console.log(`[OK] 路由到 ${handlerKey} Handler`);
                     await handler.handleFormSubmit(context, submitData);
+                } else {
+                    console.error(`[ERROR] 找不到對應的 Handler: ${handlerKey}`);
                 }
                 return;
             }
@@ -163,20 +174,20 @@ export class EchoBot extends ActivityHandler {
         console.log('[初始化] 註冊 Handler...');
         
         // 註冊異常處理 Handler
-        const issueConfig = channelConfigs.find(c => c.name === '異常');
+        const issueConfig = channelConfigs.find(c => c.name === '*異常*');
         if (issueConfig) {
             const issueHandler = new IssueChannelHandler(issueConfig);
             this.channelHandlers.set('異常', issueHandler);
             console.log(`[OK] 已註冊 Handler: 異常`);
         }
         
-        // 未來擴充範例:
-        // const requirementConfig = channelConfigs.find(c => c.name === '需求');
-        // if (requirementConfig) {
-        //     const requirementHandler = new RequirementChannelHandler(requirementConfig);
-        //     this.channelHandlers.set('需求', requirementHandler);
-        //     console.log(`[OK] 已註冊 Handler: 需求`);
-        // }
+        // 註冊需求管理 Handler
+        const requirementConfig = channelConfigs.find(c => c.name === '*需求*');
+        if (requirementConfig) {
+            const requirementHandler = new RequirementChannelHandler(requirementConfig);
+            this.channelHandlers.set('需求', requirementHandler);
+            console.log(`[OK] 已註冊 Handler: 需求`);
+        }
         
         console.log(`[初始化完成] 共註冊 ${this.channelHandlers.size} 個 Handler`);
     }

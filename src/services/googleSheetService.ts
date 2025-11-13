@@ -153,6 +153,63 @@ export class GoogleSheetService {
     }
 
     /**
+     * 將資料（陣列格式）寫入 Google Sheets
+     * @param rowData 資料陣列
+     * @param sheetId Google Sheet ID（選填，預設使用 this.spreadsheetId）
+     * @param sheetName 工作表名稱（選填，預設使用 this.sheetName）
+     */
+    public async appendRowArray(
+        rowData: any[],
+        sheetId?: string,
+        sheetName?: string
+    ): Promise<void> {
+        const targetSheetId = sheetId || this.spreadsheetId;
+        const targetSheetName = sheetName || this.sheetName;
+
+        if (!targetSheetId) {
+            console.warn('[WARN] Google Sheets 功能未啟用，跳過寫入');
+            return;
+        }
+
+        try {
+            // 確保已初始化
+            await this.initialize();
+
+            if (!this.sheets) {
+                throw new Error('Google Sheets API 初始化失敗');
+            }
+
+            console.log(`[INFO] 準備寫入 Google Sheets: ${targetSheetId} / ${targetSheetName}`);
+            console.log(`[INFO] 資料列內容:`, rowData);
+
+            // 使用 append API 將資料寫入
+            const response = await this.sheets.spreadsheets.values.append({
+                spreadsheetId: targetSheetId,
+                range: `${targetSheetName}!A:Z`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: {
+                    values: [rowData]
+                }
+            });
+
+            console.log(`[OK] Google Sheets 寫入成功: ${response.data.updates?.updatedCells} 個儲存格已更新`);
+        } catch (error) {
+            console.error('[ERROR] 寫入 Google Sheets 失敗:', error);
+            
+            // 詳細錯誤訊息
+            if (error instanceof Error) {
+                console.error(`[ERROR] 錯誤訊息: ${error.message}`);
+                if ('code' in error) {
+                    console.error(`[ERROR] 錯誤代碼: ${(error as any).code}`);
+                }
+            }
+            
+            // 不要拋出錯誤，避免影響主流程
+            // 只記錄錯誤，讓 Bot 繼續運作
+        }
+    }
+
+    /**
      * 測試 Google Sheets 連線
      */
     public async testConnection(): Promise<boolean> {

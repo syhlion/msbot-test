@@ -31,6 +31,32 @@ export function generateTicketNumber(): string {
 }
 
 /**
+ * 產生唯一的需求單號碼
+ * 格式: REQUIREMENT-YYYYMMDD-HHMMSS-RRR
+ * 例如: REQUIREMENT-20251030-163045-123
+ */
+export function generateRequirementNumber(): string {
+    const now = new Date();
+    
+    // 日期部分: YYYYMMDD
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateString = `${year}${month}${day}`;
+    
+    // 時間部分: HHMMSS
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timeString = `${hours}${minutes}${seconds}`;
+    
+    // 隨機數: 000-999
+    const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+    
+    return `REQUIREMENT-${dateString}-${timeString}-${random}`;
+}
+
+/**
  * 重置計數器（用於測試）
  * 注：新版本使用時間戳+隨機數，不需要重置
  */

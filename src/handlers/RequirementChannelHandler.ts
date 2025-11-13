@@ -1,32 +1,15 @@
 import { TurnContext, MessageFactory, CardFactory, Attachment } from 'botbuilder';
 import { BaseChannelHandler } from './BaseChannelHandler';
 import { ChannelConfig } from '../config/channelConfig';
-import { generateTicketNumber } from '../utils/ticketGenerator';
+import { generateRequirementNumber } from '../utils/ticketGenerator';
 import { googleSheetService } from '../services/googleSheetService';
-import { mapFormDataToSheetRow } from '../utils/dataMapper';
+import { RequirementFormData, mapRequirementDataToSheetRow } from '../utils/dataMapper';
 
 /**
- * 異常工單表單資料介面
+ * 需求頻道處理器
+ * 處理需求管理相關的表單和自動建單邏輯
  */
-export interface IssueFormData {
-    environment: string;
-    product: string;
-    issueDate: string;
-    issueTime: string;
-    operation: string;
-    userId?: string;
-    betOrderId?: string;
-    errorCode?: string;
-    severity: string;
-    description?: string;
-    submitter?: string;
-}
-
-/**
- * 異常頻道處理器
- * 處理異常回報相關的表單和自動建單邏輯
- */
-export class IssueChannelHandler extends BaseChannelHandler {
+export class RequirementChannelHandler extends BaseChannelHandler {
     // 儲存原始訊息連結的 Map
     private messageLinksCache = new Map<string, string>();
 
@@ -39,9 +22,9 @@ export class IssueChannelHandler extends BaseChannelHandler {
      */
     protected detectTableFormat(message: string): boolean {
         const requiredFields = [
-            /環境[\/\s]*整合商/i,
-            /產品[\/\s]*遊戲/i,
-            /異常分[級级]/i
+            /需求部門/i,
+            /產品名稱/i,
+            /需求問題/i
         ];
         
         const matchCount = requiredFields.filter(pattern => pattern.test(message)).length;
@@ -53,81 +36,115 @@ export class IssueChannelHandler extends BaseChannelHandler {
     /**
      * 解析訊息內容
      */
-    protected parseMessage(message: string): Partial<IssueFormData> {
-        const result: Partial<IssueFormData> = {};
+    protected parseMessage(message: string): Partial<RequirementFormData> {
+        const result: Partial<RequirementFormData> = {};
         
-        console.log('[INFO] 開始解析訊息內容...');
+        console.log('[INFO] 開始解析需求單訊息內容...');
         
-        // 解析環境/整合商
-        const envSection = message.match(/環境[\/\s]*整合商[\s\*＊]*([\s\S]*?)(?=產品|發現|UserID|異常|$)/i);
-        if (envSection) {
-            const lines = envSection[1].split('\n');
+        // 解析需求部門
+        const departmentSection = message.match(/需求部門[\s\*＊]*([\s\S]*?)(?=產品名稱|聯絡窗口|溝通頻道|期望上線時間|需求問題|需求文件|需求原因|需求描述|$)/i);
+        if (departmentSection) {
+            const lines = departmentSection[1].split('\n');
             const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
             if (contentLine) {
-                result.environment = contentLine.trim();
-                console.log(`[解析] 環境/整合商: ${result.environment}`);
+                result.department = contentLine.trim();
+                console.log(`[解析] 需求部門: ${result.department}`);
             }
         }
         
-        // 解析產品/遊戲
-        const productSection = message.match(/產品[\/\s]*遊戲[\s\*＊]*([\s\S]*?)(?=發現|UserID|異常|$)/i);
+        // 解析產品名稱
+        const productSection = message.match(/產品名稱[\s\*＊]*([\s\S]*?)(?=聯絡窗口|溝通頻道|期望上線時間|需求問題|需求文件|需求原因|需求描述|$)/i);
         if (productSection) {
             const lines = productSection[1].split('\n');
             const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
             if (contentLine) {
                 result.product = contentLine.trim();
-                console.log(`[解析] 產品/遊戲: ${result.product}`);
+                console.log(`[解析] 產品名稱: ${result.product}`);
             }
         }
         
-        // 解析發現異常時間
-        const issueTimeMatch = message.match(/發[現生][異常]*時間[\s\*＊]*[\s\S]*?(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i);
-        if (issueTimeMatch) {
-            result.issueDate = `${issueTimeMatch[1]}-${issueTimeMatch[2]}-${issueTimeMatch[3]}`;
-            result.issueTime = `${issueTimeMatch[4]}:${issueTimeMatch[5]}`;
-            console.log(`[解析] 發現異常時間: ${result.issueDate} ${result.issueTime}`);
-        }
-        
-        // 解析 UserID 與 注單編號
-        const userIdSection = message.match(/UserID\s*與\s*注單編號[\s\*＊]*([\s\S]*?)(?=異常代碼|異常單|異常分|$)/i);
-        if (userIdSection) {
-            const lines = userIdSection[1].split('\n');
+        // 解析聯絡窗口
+        const contactSection = message.match(/聯絡窗口[\s\*＊]*([\s\S]*?)(?=溝通頻道|期望上線時間|需求問題|需求文件|需求原因|需求描述|$)/i);
+        if (contactSection) {
+            const lines = contactSection[1].split('\n');
             const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
             if (contentLine) {
-                result.userId = contentLine.trim();
-                console.log(`[解析] UserID 與 注單編號: ${result.userId}`);
+                result.contact = contentLine.trim();
+                console.log(`[解析] 聯絡窗口: ${result.contact}`);
             }
         }
         
-        // 解析異常代碼
-        const errorCodeSection = message.match(/異常代碼[\s\*＊]*([\s\S]*?)(?=異常單|異常分|$)/i);
-        if (errorCodeSection) {
-            const lines = errorCodeSection[1].split('\n');
+        // 解析溝通頻道
+        const channelSection = message.match(/溝通頻道[\s\*＊]*([\s\S]*?)(?=期望上線時間|需求問題|需求文件|需求原因|需求描述|$)/i);
+        if (channelSection) {
+            const lines = channelSection[1].split('\n');
             const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
             if (contentLine) {
-                result.errorCode = contentLine.trim();
-                console.log(`[解析] 異常代碼: ${result.errorCode}`);
-            } else {
-                console.log(`[解析] 異常代碼: (欄位為空)`);
+                result.communicationChannel = contentLine.trim();
+                console.log(`[解析] 溝通頻道: ${result.communicationChannel}`);
             }
         }
         
-        // 解析異常分級
-        const severitySection = message.match(/異常分[級级][\s\*＊]*([\s\S]*?)(?=問題|$)/i);
-        if (severitySection) {
-            const lines = severitySection[1].split('\n');
+        // 解析期望上線時間（支援多種日期格式）
+        const dateSection = message.match(/期望上線時間[\s\*＊]*([\s\S]*?)(?=需求問題|需求文件|需求原因|需求描述|$)/i);
+        if (dateSection) {
+            const lines = dateSection[1].split('\n');
             const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
             if (contentLine) {
-                result.severity = contentLine.trim();
-                console.log(`[解析] 異常分級: ${result.severity}`);
+                // 嘗試解析日期格式 (YYYY/MM/DD 或 YYYY-MM-DD)
+                const dateMatch = contentLine.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+                if (dateMatch) {
+                    const year = dateMatch[1];
+                    const month = dateMatch[2].padStart(2, '0');
+                    const day = dateMatch[3].padStart(2, '0');
+                    result.expectedOnlineDate = `${year}-${month}-${day}`;
+                    console.log(`[解析] 期望上線時間: ${result.expectedOnlineDate}`);
+                }
             }
         }
         
-        // 解析發生異常操作
-        const operationMatch = message.match(/問題\s*[:\s：]*([^\n]+)/);
-        if (operationMatch) {
-            result.operation = operationMatch[1].trim();
-            console.log(`[解析] 發生異常操作: ${result.operation}`);
+        // 解析需求問題
+        const issueSection = message.match(/需求問題[\s\*＊]*([\s\S]*?)(?=需求文件|需求原因|需求描述|$)/i);
+        if (issueSection) {
+            const lines = issueSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.requirementIssue = contentLine.trim();
+                console.log(`[解析] 需求問題: ${result.requirementIssue}`);
+            }
+        }
+        
+        // 解析需求文件
+        const documentSection = message.match(/需求文件[\s\*＊]*([\s\S]*?)(?=需求原因|需求描述|$)/i);
+        if (documentSection) {
+            const lines = documentSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.requirementDocument = contentLine.trim();
+                console.log(`[解析] 需求文件: ${result.requirementDocument}`);
+            }
+        }
+        
+        // 解析需求原因
+        const reasonSection = message.match(/需求原因[\s\*＊]*([\s\S]*?)(?=需求描述|$)/i);
+        if (reasonSection) {
+            const lines = reasonSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.requirementReason = contentLine.trim();
+                console.log(`[解析] 需求原因: ${result.requirementReason}`);
+            }
+        }
+        
+        // 解析需求描述
+        const descriptionSection = message.match(/需求描述[\s\*＊]*([\s\S]*?)$/i);
+        if (descriptionSection) {
+            const lines = descriptionSection[1].split('\n');
+            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
+            if (contentLine) {
+                result.description = contentLine.trim();
+                console.log(`[解析] 需求描述: ${result.description}`);
+            }
         }
         
         console.log('[INFO] 解析完成');
@@ -153,37 +170,42 @@ export class IssueChannelHandler extends BaseChannelHandler {
             // 取得提交人資訊
             const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
             
-            // 產生工單號碼
-            const ticketNumber = generateTicketNumber();
-            console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
+            // 產生需求單號碼
+            const requirementNumber = generateRequirementNumber();
+            console.log(`[OK] 產生需求單號碼: ${requirementNumber}`);
             
             // 建立 Teams 訊息連結
-            const issueLink = this.buildTeamsMessageLink(context);
+            const requirementLink = this.buildTeamsMessageLink(context);
             
             // 準備表單資料
-            const recordData: IssueFormData = {
-                environment: parsedData.environment || '',
+            const recordData: RequirementFormData = {
+                department: parsedData.department || '',
                 product: parsedData.product || '',
-                issueDate: parsedData.issueDate || new Date().toISOString().split('T')[0],
-                issueTime: parsedData.issueTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
-                operation: parsedData.operation || '',
-                userId: parsedData.userId,
-                betOrderId: parsedData.betOrderId,
-                errorCode: parsedData.errorCode,
-                severity: parsedData.severity || '',
+                contact: parsedData.contact || '',
+                communicationChannel: parsedData.communicationChannel || '/',
+                expectedOnlineDate: parsedData.expectedOnlineDate || new Date().toISOString().split('T')[0],
+                requirementIssue: parsedData.requirementIssue || '',
+                requirementDocument: parsedData.requirementDocument,
+                requirementReason: parsedData.requirementReason || '',
+                description: parsedData.description,
                 submitter: submitterName
             };
             
             // 寫入 Google Sheets
             if (googleSheetService.isEnabled()) {
                 console.log('[INFO] 開始寫入 Google Sheets...');
-                const sheetRowData = mapFormDataToSheetRow(ticketNumber, recordData, issueLink);
+                const sheetRowData = mapRequirementDataToSheetRow(requirementNumber, recordData, requirementLink);
                 
-                await googleSheetService.appendRow(sheetRowData);
-                console.log(`[OK] Google Sheets 寫入成功: ${ticketNumber}`);
+                // 使用需求單的 Sheet 設定
+                await googleSheetService.appendRowArray(
+                    sheetRowData,
+                    this.config.sheetId,
+                    this.config.sheetName
+                );
+                console.log(`[OK] Google Sheets 寫入成功: ${requirementNumber}`);
                 
                 // 顯示確認卡片
-                await this.sendConfirmationCard(context, ticketNumber, recordData);
+                await this.sendConfirmationCard(context, requirementNumber, recordData);
                 return true;
             }
             
@@ -207,7 +229,7 @@ export class IssueChannelHandler extends BaseChannelHandler {
             console.log(`[INFO] 已快取訊息連結`);
         }
         
-        const card = this.createRecordFormCard();
+        const card = this.createRequirementFormCard();
         const message = MessageFactory.attachment(card);
         await context.sendActivity(message);
     }
@@ -217,29 +239,33 @@ export class IssueChannelHandler extends BaseChannelHandler {
      */
     public async handleFormSubmit(context: TurnContext, formData: any): Promise<void> {
         try {
-            console.log('[INFO] 處理異常工單表單提交');
+            console.log('[INFO] 處理需求單表單提交');
             
             const submitterName = context.activity.from.name || context.activity.from.id || '未知使用者';
-            const ticketNumber = generateTicketNumber();
-            console.log(`[OK] 產生工單號碼: ${ticketNumber}`);
+            const requirementNumber = generateRequirementNumber();
+            console.log(`[OK] 產生需求單號碼: ${requirementNumber}`);
             
             // 取得快取的訊息連結
             const conversationId = context.activity.conversation?.id || '';
-            const issueLink = this.messageLinksCache.get(conversationId) || '';
+            const requirementLink = this.messageLinksCache.get(conversationId) || '';
             
-            const recordData: IssueFormData = {
+            const recordData: RequirementFormData = {
                 ...formData,
                 submitter: submitterName
             };
             
             if (googleSheetService.isEnabled()) {
-                const sheetRowData = mapFormDataToSheetRow(ticketNumber, recordData, issueLink);
-                await googleSheetService.appendRow(sheetRowData);
-                console.log(`[OK] Google Sheets 寫入成功: ${ticketNumber}`);
+                const sheetRowData = mapRequirementDataToSheetRow(requirementNumber, recordData, requirementLink);
+                await googleSheetService.appendRowArray(
+                    sheetRowData,
+                    this.config.sheetId,
+                    this.config.sheetName
+                );
+                console.log(`[OK] Google Sheets 寫入成功: ${requirementNumber}`);
             }
             
             // 更新為確認卡片
-            const confirmationCard = this.createConfirmationCard(ticketNumber, recordData);
+            const confirmationCard = this.createConfirmationCard(requirementNumber, recordData);
             const updateActivity = MessageFactory.attachment(confirmationCard);
             updateActivity.id = context.activity.replyToId;
             
@@ -293,9 +319,9 @@ export class IssueChannelHandler extends BaseChannelHandler {
     }
 
     /**
-     * 建立工單記錄表單的 Adaptive Card
+     * 建立需求單記錄表單的 Adaptive Card
      */
-    private createRecordFormCard(): Attachment {
+    private createRequirementFormCard(): Attachment {
         return CardFactory.adaptiveCard({
             $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
             type: 'AdaptiveCard',
@@ -303,7 +329,7 @@ export class IssueChannelHandler extends BaseChannelHandler {
             body: [
                 {
                     type: 'TextBlock',
-                    text: '遊戲商系統 SRE 工單記錄',
+                    text: '需求單記錄',
                     weight: 'Bolder',
                     size: 'Large'
                 },
@@ -315,85 +341,73 @@ export class IssueChannelHandler extends BaseChannelHandler {
                 },
                 {
                     type: 'Input.ChoiceSet',
-                    id: 'environment',
-                    label: '環境/整合商 *',
+                    id: 'department',
+                    label: '需求部門 *',
                     style: 'compact',
                     isRequired: true,
-                    errorMessage: '請選擇環境',
+                    errorMessage: '請選擇需求部門',
                     choices: [
-                        { title: 'pgs-prod', value: 'pgs-prod' },
-                        { title: 'pgs-stage', value: 'pgs-stage' },
-                        { title: '1xbet', value: '1xbet' },
+                        { title: 'EL白牌', value: 'EL白牌' },
                         { title: '其他', value: '其他' }
                     ]
                 },
                 {
-                    type: 'Input.ChoiceSet',
+                    type: 'Input.Text',
                     id: 'product',
-                    label: '產品/遊戲 *',
-                    style: 'compact',
+                    label: '產品名稱 *',
                     isRequired: true,
-                    errorMessage: '請選擇產品',
-                    choices: [
-                        { title: '老虎機', value: '老虎機' },
-                        { title: '棋牌', value: '棋牌' },
-                        { title: '魚機', value: '魚機' },
-                        { title: '其他', value: '其他' }
-                    ]
+                    errorMessage: '請輸入產品名稱'
+                },
+                {
+                    type: 'Input.Text',
+                    id: 'contact',
+                    label: '聯絡窗口 *',
+                    placeholder: '例如：siya.li(李雯凤)',
+                    isRequired: true,
+                    errorMessage: '請輸入聯絡窗口'
+                },
+                {
+                    type: 'Input.Text',
+                    id: 'communicationChannel',
+                    label: '溝通頻道',
+                    placeholder: '例如：/ 或 Slack',
+                    value: '/'
                 },
                 {
                     type: 'Input.Date',
-                    id: 'issueDate',
-                    label: '發生異常日期 *',
+                    id: 'expectedOnlineDate',
+                    label: '期望上線時間 *',
                     isRequired: true,
                     errorMessage: '請選擇日期'
                 },
                 {
-                    type: 'Input.Time',
-                    id: 'issueTime',
-                    label: '發生異常時間 *',
-                    isRequired: true,
-                    errorMessage: '請選擇時間'
-                },
-                {
                     type: 'Input.Text',
-                    id: 'operation',
-                    label: '發生異常操作 *',
+                    id: 'requirementIssue',
+                    label: '需求問題 *',
                     isMultiline: true,
                     isRequired: true,
-                    errorMessage: '請描述發生的異常操作'
+                    errorMessage: '請描述需求問題'
                 },
                 {
                     type: 'Input.Text',
-                    id: 'userId',
-                    label: 'UserID',
-                    placeholder: '例如：792f88d3-6836-48e4-82dd-479fc1982286'
+                    id: 'requirementDocument',
+                    label: '需求文件',
+                    placeholder: '例如：Google Sheets 連結'
                 },
                 {
                     type: 'Input.Text',
-                    id: 'betOrderId',
-                    label: '注單編號',
-                    placeholder: '例如：BET-20251103-001'
-                },
-                {
-                    type: 'Input.Text',
-                    id: 'errorCode',
-                    label: '錯誤代碼',
-                    placeholder: '例如：ERR3331（選填）'
-                },
-                {
-                    type: 'Input.ChoiceSet',
-                    id: 'severity',
-                    label: '異常嚴重度 *',
-                    style: 'compact',
+                    id: 'requirementReason',
+                    label: '需求原因 *',
+                    isMultiline: true,
                     isRequired: true,
-                    errorMessage: '請選擇嚴重度',
-                    choices: [
-                        { title: 'P0 - 緊急', value: 'P0' },
-                        { title: 'P1 - 高', value: 'P1' },
-                        { title: 'P2 - 中', value: 'P2' },
-                        { title: 'P3 - 低', value: 'P3' }
-                    ]
+                    errorMessage: '請說明需求原因'
+                },
+                {
+                    type: 'Input.Text',
+                    id: 'description',
+                    label: '需求描述',
+                    isMultiline: true,
+                    placeholder: '其他補充說明（選填）'
                 }
             ],
             actions: [
@@ -402,7 +416,7 @@ export class IssueChannelHandler extends BaseChannelHandler {
                     title: '提交',
                     data: {
                         action: 'submit',
-                        formType: 'issue'
+                        formType: 'requirement'
                     },
                     style: 'positive'
                 },
@@ -420,7 +434,7 @@ export class IssueChannelHandler extends BaseChannelHandler {
     /**
      * 建立確認卡片
      */
-    private createConfirmationCard(ticketNumber: string, data: IssueFormData): Attachment {
+    private createConfirmationCard(requirementNumber: string, data: RequirementFormData): Attachment {
         return CardFactory.adaptiveCard({
             $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
             type: 'AdaptiveCard',
@@ -450,7 +464,7 @@ export class IssueChannelHandler extends BaseChannelHandler {
                                     items: [
                                         {
                                             type: 'TextBlock',
-                                            text: '工單記錄已提交',
+                                            text: '需求單已提交',
                                             weight: 'Bolder',
                                             size: 'Large'
                                         }
@@ -463,48 +477,50 @@ export class IssueChannelHandler extends BaseChannelHandler {
                 {
                     type: 'FactSet',
                     facts: [
-                        { title: '工單號碼', value: ticketNumber },
+                        { title: '需求單編號', value: requirementNumber },
                         { title: '提交人', value: data.submitter || '' },
-                        { title: '環境/整合商', value: data.environment },
-                        { title: '產品/遊戲', value: data.product },
-                        { title: '發現異常時間', value: `${data.issueDate} ${data.issueTime}` },
-                        { title: '異常分級', value: data.severity },
-                        { title: '發生異常操作：', value: '' }
+                        { title: '需求部門', value: data.department },
+                        { title: '產品名稱', value: data.product },
+                        { title: '聯絡窗口', value: data.contact },
+                        { title: '溝通頻道', value: data.communicationChannel || '/' },
+                        { title: '期望上線時間', value: data.expectedOnlineDate },
+                        { title: '需求問題：', value: '' }
                     ]
                 },
                 {
                     type: 'TextBlock',
-                    text: data.operation,
+                    text: data.requirementIssue,
                     wrap: true
                 },
-                ...(data.userId ? [{
+                ...(data.requirementDocument ? [{
                     type: 'FactSet',
                     facts: [
-                        { title: 'UserID：', value: '' }
+                        { title: '需求文件：', value: '' }
                     ]
                 }, {
                     type: 'TextBlock',
-                    text: data.userId,
+                    text: data.requirementDocument,
                     wrap: true
                 }] : []),
-                ...(data.betOrderId ? [{
+                {
                     type: 'FactSet',
                     facts: [
-                        { title: '注單編號：', value: '' }
+                        { title: '需求原因：', value: '' }
                     ]
-                }, {
+                },
+                {
                     type: 'TextBlock',
-                    text: data.betOrderId,
+                    text: data.requirementReason,
                     wrap: true
-                }] : []),
-                ...(data.errorCode ? [{
+                },
+                ...(data.description ? [{
                     type: 'FactSet',
                     facts: [
-                        { title: '錯誤代碼：', value: '' }
+                        { title: '需求描述：', value: '' }
                     ]
                 }, {
                     type: 'TextBlock',
-                    text: data.errorCode,
+                    text: data.description,
                     wrap: true
                 }] : []),
                 {
@@ -522,8 +538,8 @@ export class IssueChannelHandler extends BaseChannelHandler {
     /**
      * 發送確認卡片（用於自動建單）
      */
-    private async sendConfirmationCard(context: TurnContext, ticketNumber: string, data: IssueFormData): Promise<void> {
-        const confirmationCard = this.createConfirmationCard(ticketNumber, data);
+    private async sendConfirmationCard(context: TurnContext, requirementNumber: string, data: RequirementFormData): Promise<void> {
+        const confirmationCard = this.createConfirmationCard(requirementNumber, data);
         const message = MessageFactory.attachment(confirmationCard);
         await context.sendActivity(message);
     }
