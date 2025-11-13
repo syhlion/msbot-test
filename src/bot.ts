@@ -140,11 +140,14 @@ export class EchoBot extends ActivityHandler {
             console.log(`[OK] 關鍵字匹配成功`);
 
             // 路由到對應的 Handler
-            const handler = this.channelHandlers.get(config.name);
+            // 移除萬用字元 * 來獲取 Handler key
+            const handlerKey = config.name.replace(/\*/g, '');
+            const handler = this.channelHandlers.get(handlerKey);
             if (handler) {
+                console.log(`[OK] 路由到 Handler: ${handlerKey}`);
                 await handler.handle(context, userMessage);
             } else {
-                console.log(`[錯誤] 找不到 Handler: ${config.name}`);
+                console.log(`[錯誤] 找不到 Handler: ${handlerKey} (config.name: ${config.name})`);
             }
 
             await next();
