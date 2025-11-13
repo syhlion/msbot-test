@@ -356,7 +356,8 @@ export class RequirementChannelHandler extends BaseChannelHandler {
                     id: 'expectedOnlineDate',
                     label: '期望上線時間 *',
                     isRequired: true,
-                    errorMessage: '請選擇日期'
+                    errorMessage: '請選擇日期',
+                    min: new Date().toISOString().split('T')[0]  // 限制不能選擇過去日期
                 },
                 {
                     type: 'Input.Text',
