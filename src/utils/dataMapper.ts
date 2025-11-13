@@ -24,7 +24,6 @@ export interface RequirementFormData {
     department: string;           // 需求部門
     product: string;              // 產品名稱
     contact: string;              // 聯絡窗口
-    communicationChannel?: string; // 溝通頻道
     expectedOnlineDate: string;   // 期望上線時間
     requirementIssue: string;     // 需求問題
     requirementDocument?: string; // 需求文件
@@ -90,33 +89,24 @@ export function mapRequirementDataToSheetRow(
     formData: RequirementFormData,
     requirementLink: string = ''
 ): any[] {
-    // 產生台灣時區的建立時間
-    const createTime = new Date().toLocaleString('zh-TW', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    // 使用 HYPERLINK 函數來顯示超連結
+    const linkFormula = requirementLink 
+        ? `=HYPERLINK("${requirementLink}", "查看原始訊息")` 
+        : '';
 
     // 返回陣列格式，對應 Google Sheets 的欄位順序
     return [
-        requirementNumber,                              // A: 需求編號
+        requirementNumber,                              // A: 需求單號
         formData.department,                            // B: 需求部門
         formData.product,                               // C: 產品名稱
         formData.contact,                               // D: 聯絡窗口
-        formData.communicationChannel || '/',           // E: 溝通頻道
-        formData.expectedOnlineDate,                    // F: 期望上線時間
-        formData.requirementIssue,                      // G: 需求問題
-        formData.requirementDocument || '',             // H: 需求文件
-        formData.requirementReason,                     // I: 需求原因
-        formData.description || '',                     // J: 需求描述
-        formData.submitter || '',                       // K: 提交人
-        createTime,                                     // L: 建立時間
-        requirementLink                                 // M: 需求單連結
+        formData.expectedOnlineDate,                    // E: 期望上線時間
+        formData.requirementIssue,                      // F: 需求問題
+        formData.requirementDocument || '',             // G: 需求文件
+        formData.requirementReason,                     // H: 需求原因
+        formData.description || '',                     // I: 需求描述
+        formData.submitter || '',                       // J: 需求填寫人員
+        linkFormula                                     // K: 需求單連結（使用 HYPERLINK 函數）
     ];
 }
 

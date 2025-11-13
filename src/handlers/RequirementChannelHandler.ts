@@ -74,16 +74,6 @@ export class RequirementChannelHandler extends BaseChannelHandler {
             }
         }
         
-        // 解析溝通頻道
-        const channelSection = message.match(/溝通頻道[\s\*＊]*([\s\S]*?)(?=期望上線時間|需求問題|需求文件|需求原因|需求描述|$)/i);
-        if (channelSection) {
-            const lines = channelSection[1].split('\n');
-            const contentLine = lines.find(line => line.trim() && !line.match(/^[\s\*＊]+$/));
-            if (contentLine) {
-                result.communicationChannel = contentLine.trim();
-                console.log(`[解析] 溝通頻道: ${result.communicationChannel}`);
-            }
-        }
         
         // 解析期望上線時間（支援多種日期格式）
         const dateSection = message.match(/期望上線時間[\s\*＊]*([\s\S]*?)(?=需求問題|需求文件|需求原因|需求描述|$)/i);
@@ -182,7 +172,6 @@ export class RequirementChannelHandler extends BaseChannelHandler {
                 department: parsedData.department || '',
                 product: parsedData.product || '',
                 contact: parsedData.contact || '',
-                communicationChannel: parsedData.communicationChannel || '/',
                 expectedOnlineDate: parsedData.expectedOnlineDate || new Date().toISOString().split('T')[0],
                 requirementIssue: parsedData.requirementIssue || '',
                 requirementDocument: parsedData.requirementDocument,
@@ -340,16 +329,12 @@ export class RequirementChannelHandler extends BaseChannelHandler {
                     spacing: 'Small'
                 },
                 {
-                    type: 'Input.ChoiceSet',
+                    type: 'Input.Text',
                     id: 'department',
                     label: '需求部門 *',
-                    style: 'compact',
+                    placeholder: '例如：EL白牌',
                     isRequired: true,
-                    errorMessage: '請選擇需求部門',
-                    choices: [
-                        { title: 'EL白牌', value: 'EL白牌' },
-                        { title: '其他', value: '其他' }
-                    ]
+                    errorMessage: '請輸入需求部門'
                 },
                 {
                     type: 'Input.Text',
@@ -365,13 +350,6 @@ export class RequirementChannelHandler extends BaseChannelHandler {
                     placeholder: '例如：siya.li(李雯凤)',
                     isRequired: true,
                     errorMessage: '請輸入聯絡窗口'
-                },
-                {
-                    type: 'Input.Text',
-                    id: 'communicationChannel',
-                    label: '溝通頻道',
-                    placeholder: '例如：/ 或 Slack',
-                    value: '/'
                 },
                 {
                     type: 'Input.Date',
@@ -482,7 +460,6 @@ export class RequirementChannelHandler extends BaseChannelHandler {
                         { title: '需求部門', value: data.department },
                         { title: '產品名稱', value: data.product },
                         { title: '聯絡窗口', value: data.contact },
-                        { title: '溝通頻道', value: data.communicationChannel || '/' },
                         { title: '期望上線時間', value: data.expectedOnlineDate },
                         { title: '需求問題：', value: '' }
                     ]
