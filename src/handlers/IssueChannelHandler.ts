@@ -334,7 +334,8 @@ export class IssueChannelHandler extends BaseChannelHandler {
                     id: 'issueDate',
                     label: '發生異常日期 *',
                     isRequired: true,
-                    errorMessage: '請選擇日期'
+                    errorMessage: '請選擇日期',
+                    max: new Date().toISOString().split('T')[0]  // 限制不能選擇未來日期
                 },
                 {
                     type: 'Input.Time',
