@@ -89,6 +89,8 @@ export function getChannelConfig(channelName: string): ChannelConfig | null {
         }
     });
     
+
+    
     if (config) {
         console.log(`[匹配] 頻道名稱「${channelName}」匹配配置「${config.name}」`);
     }
