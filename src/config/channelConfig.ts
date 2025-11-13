@@ -102,10 +102,10 @@ export function getChannelConfig(channelName: string): ChannelConfig | null {
  * 檢查訊息是否包含必要的關鍵字
  * @param message 訊息內容
  * @param keywords 關鍵字列表
- * @returns 是否所有關鍵字都存在
+ * @returns 是否至少包含一個關鍵字（OR 邏輯）
  */
 export function hasRequiredKeywords(message: string, keywords: string[]): boolean {
-    return keywords.every(keyword => 
+    return keywords.some(keyword => 
         message.toLowerCase().includes(keyword.toLowerCase())
     );
 }
