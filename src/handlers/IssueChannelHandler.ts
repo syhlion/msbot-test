@@ -314,32 +314,20 @@ export class IssueChannelHandler extends BaseChannelHandler {
                     spacing: 'Small'
                 },
                 {
-                    type: 'Input.ChoiceSet',
+                    type: 'Input.Text',
                     id: 'environment',
                     label: '環境/整合商 *',
-                    style: 'compact',
+                    placeholder: '例如：pgs-prod、pgs-stage、1xbet',
                     isRequired: true,
-                    errorMessage: '請選擇環境',
-                    choices: [
-                        { title: 'pgs-prod', value: 'pgs-prod' },
-                        { title: 'pgs-stage', value: 'pgs-stage' },
-                        { title: '1xbet', value: '1xbet' },
-                        { title: '其他', value: '其他' }
-                    ]
+                    errorMessage: '請輸入環境/整合商'
                 },
                 {
-                    type: 'Input.ChoiceSet',
+                    type: 'Input.Text',
                     id: 'product',
                     label: '產品/遊戲 *',
-                    style: 'compact',
+                    placeholder: '例如：老虎機、棋牌、魚機',
                     isRequired: true,
-                    errorMessage: '請選擇產品',
-                    choices: [
-                        { title: '老虎機', value: '老虎機' },
-                        { title: '棋牌', value: '棋牌' },
-                        { title: '魚機', value: '魚機' },
-                        { title: '其他', value: '其他' }
-                    ]
+                    errorMessage: '請輸入產品/遊戲'
                 },
                 {
                     type: 'Input.Date',
